@@ -61,3 +61,29 @@ export function useCompleteSuggestion() {
     },
   });
 }
+
+export function useCreateSuggestion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      organizationId: string;
+      type: string;
+      title: string;
+      description: string;
+      context?: string;
+      conditions?: any;
+      itemIds?: string[];
+      autoApply?: boolean;
+    }) => suggestionsService.createSuggestion(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: suggestionsKeys.all });
+    },
+  });
+}
+
+export function useAnalyzeSuggestions() {
+  return useMutation({
+    mutationFn: (organizationId: string) => suggestionsService.analyzeOrganization(organizationId),
+  });
+}

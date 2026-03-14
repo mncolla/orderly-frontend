@@ -4,7 +4,7 @@ import { ChevronRight, ChevronLeft, Check, Store, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { organizationsService } from '../services/organizationsService';
-import { useConnectPedidosYa, useVerifyOTP } from '../hooks/useIntegrations';
+import { useConnectPedidosYa } from '../hooks/useIntegrations';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,9 +31,8 @@ export function OnboardingWizard() {
   const [needsOTP, setNeedsOTP] = useState(false);
   const [connectionError, setConnectionError] = useState('');
 
-  // Mutations for platform connection
+  // Mutation for platform connection (used for both connect and verify-otp)
   const connectMutation = useConnectPedidosYa();
-  const verifyOTPMutation = useVerifyOTP();
 
   // Step 1: Costs
   const [costs, setCosts] = useState<OrganizationCosts>({
@@ -115,10 +114,10 @@ export function OnboardingWizard() {
     }
 
     try {
-      const response = await verifyOTPMutation.mutateAsync({
+      const response = await connectMutation.mutateAsync({
         email: connectionEmail,
         password: connectionPassword,
-        otp: otpCode,
+        otpCode: otpCode, // Send OTP code to the same /connect endpoint
       });
 
       setCreatedOrganization(response.organization);
@@ -229,10 +228,10 @@ export function OnboardingWizard() {
 
                 <Button
                   type="submit"
-                  disabled={verifyOTPMutation.isPending || otpCode.length !== 6}
+                  disabled={connectMutation.isPending || otpCode.length !== 6}
                   className="w-full"
                 >
-                  {verifyOTPMutation.isPending ? (
+                  {connectMutation.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Verificando...

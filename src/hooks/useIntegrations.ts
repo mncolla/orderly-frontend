@@ -17,7 +17,7 @@ export function useConnectPedidosYa() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { email: string; password: string }) =>
+    mutationFn: (data: { email: string; password: string; otpCode?: string }) =>
       integrationsService.connectPedidosYa(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: integrationsKeys.status });

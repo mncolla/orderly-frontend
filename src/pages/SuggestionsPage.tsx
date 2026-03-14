@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Lightbulb, CheckCircle2, XCircle, Clock, TrendingUp } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { useSuggestions, useApplySuggestion, useDismissSuggestion, useCompleteSuggestion } from '../hooks/useSuggestions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 const typeLabels: Record<string, string> = {
   ITEM_OPTIMIZATION: 'Optimización de Item',
@@ -27,6 +29,66 @@ export function SuggestionsPage() {
   const applyMutation = useApplySuggestion();
   const dismissMutation = useDismissSuggestion();
   const completeMutation = useCompleteSuggestion();
+
+  // Modal states
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    type: 'accept' | 'reject' | 'complete';
+    suggestionId: string;
+    suggestionTitle: string;
+  }>({
+    open: false,
+    type: 'accept',
+    suggestionId: '',
+    suggestionTitle: '',
+  });
+
+  const handleAccept = (suggestionId: string, suggestionTitle: string) => {
+    setConfirmDialog({
+      open: true,
+      type: 'accept',
+      suggestionId,
+      suggestionTitle,
+    });
+  };
+
+  const handleReject = (suggestionId: string, suggestionTitle: string) => {
+    setConfirmDialog({
+      open: true,
+      type: 'reject',
+      suggestionId,
+      suggestionTitle,
+    });
+  };
+
+  const handleComplete = (suggestionId: string, suggestionTitle: string) => {
+    setConfirmDialog({
+      open: true,
+      type: 'complete',
+      suggestionId,
+      suggestionTitle,
+    });
+  };
+
+  const handleConfirmAction = async () => {
+    const { type, suggestionId, suggestionTitle } = confirmDialog;
+
+    try {
+      if (type === 'accept') {
+        await applyMutation.mutateAsync(suggestionId);
+        toast.success(`"${suggestionTitle}" aceptada correctamente`);
+      } else if (type === 'reject') {
+        await dismissMutation.mutateAsync(suggestionId);
+        toast.success(`"${suggestionTitle}" rechazada`);
+      } else if (type === 'complete') {
+        await completeMutation.mutateAsync(suggestionId);
+        toast.success(`"${suggestionTitle}" completada - Reporte final generado`);
+      }
+      setConfirmDialog({ open: false, type: 'accept', suggestionId: '', suggestionTitle: '' });
+    } catch (error) {
+      toast.error('Hubo un problema al procesar tu solicitud');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -263,14 +325,14 @@ export function SuggestionsPage() {
                     {suggestion.status === 'PENDING' && isOwner && (
                       <>
                         <Button
-                          onClick={() => applyMutation.mutate(suggestion.id)}
+                          onClick={() => handleAccept(suggestion.id, suggestion.title)}
                           disabled={applyMutation.isPending}
                           className="bg-blue-600 hover:bg-blue-700"
                         >
                           {applyMutation.isPending ? 'Aplicando...' : 'Aceptar'}
                         </Button>
                         <Button
-                          onClick={() => dismissMutation.mutate(suggestion.id)}
+                          onClick={() => handleReject(suggestion.id, suggestion.title)}
                           disabled={dismissMutation.isPending}
                           variant="outline"
                           className="border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
@@ -282,7 +344,7 @@ export function SuggestionsPage() {
 
                     {suggestion.status === 'ACCEPTED' && isAgency && (
                       <Button
-                        onClick={() => completeMutation.mutate(suggestion.id)}
+                        onClick={() => handleComplete(suggestion.id, suggestion.title)}
                         disabled={completeMutation.isPending}
                         className="bg-green-600 hover:bg-green-700"
                       >
@@ -304,6 +366,37 @@ export function SuggestionsPage() {
             ))
           )}
         </div>
+
+        {/* Confirm Dialog */}
+        <ConfirmDialog
+          open={confirmDialog.open}
+          onOpenChange={(open) =>
+            setConfirmDialog({ ...confirmDialog, open })
+          }
+          onConfirm={handleConfirmAction}
+          title={
+            confirmDialog.type === 'accept'
+              ? '¿Aceptar sugerencia?'
+              : confirmDialog.type === 'reject'
+              ? '¿Rechazar sugerencia?'
+              : '¿Completar medición?'
+          }
+          description={
+            confirmDialog.type === 'accept'
+              ? `Esta acción aceptará "${confirmDialog.suggestionTitle}" y comenzará a medir su impacto.`
+              : confirmDialog.type === 'reject'
+              ? `Esta acción rechazará "${confirmDialog.suggestionTitle}". Esta acción no se puede deshacer.`
+              : `Esta acción completará la medición de "${confirmDialog.suggestionTitle}" y generará el reporte final de impacto.`
+          }
+          type={confirmDialog.type}
+          isPending={
+            confirmDialog.type === 'accept'
+              ? applyMutation.isPending
+              : confirmDialog.type === 'reject'
+              ? dismissMutation.isPending
+              : completeMutation.isPending
+          }
+        />
       </div>
     </main>
   );

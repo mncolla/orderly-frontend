@@ -14,6 +14,27 @@ import { SuggestionsPage } from './pages/SuggestionsPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { IntegrationsPage } from './pages/IntegrationsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { AgencyDashboard } from './pages/AgencyDashboard';
+import { AgencyOrganizationsPage } from './pages/AgencyOrganizationsPage';
+import { AgencyOrganizationDetailPage } from './pages/AgencyOrganizationDetailPage';
+import { CreateSuggestionPage } from './pages/CreateSuggestionPage';
+import { useEffect, useState } from 'react';
+import { useAuth } from './contexts/AuthContext';
+
+function RoleBasedRedirect() {
+  const { user } = useAuth();
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setShouldRedirect(true);
+    }
+  }, [user]);
+
+  if (!shouldRedirect) return null;
+
+  return <Redirect to={user?.role === 'AGENCY' ? '/agency' : '/overview'} />;
+}
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -99,8 +120,47 @@ function App() {
               </OnboardingGuard>
             </ProtectedRoute>
           </Route>
+          {/* Agency Routes */}
+          <Route path="/agency">
+            <ProtectedRoute>
+              <DashboardLayout>
+                <AgencyDashboard />
+              </DashboardLayout>
+            </ProtectedRoute>
+          </Route>
+          <Route path="/agency/organizations">
+            <ProtectedRoute>
+              <DashboardLayout>
+                <AgencyOrganizationsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          </Route>
+          <Route path="/agency/organizations/:id">
+            <ProtectedRoute>
+              <DashboardLayout>
+                <AgencyOrganizationDetailPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          </Route>
+          <Route path="/agency/suggestions">
+            <ProtectedRoute>
+              <DashboardLayout>
+                <SuggestionsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          </Route>
+          <Route path="/agency/suggestions/create">
+            <ProtectedRoute>
+              <DashboardLayout>
+                <CreateSuggestionPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          </Route>
+
           <Route path="/">
-            <Redirect to="/overview" />
+            <ProtectedRoute>
+              <RoleBasedRedirect />
+            </ProtectedRoute>
           </Route>
         </Router>
       </OrganizationProvider>

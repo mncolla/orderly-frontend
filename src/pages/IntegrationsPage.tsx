@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Megaphone, CheckCircle2, RefreshCw, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useAuth } from '../contexts/AuthContext';
-import { useIntegrationStatus, useConnectPedidosYa, useVerifyOTP, useSync, useDisconnect } from '../hooks/useIntegrations';
+import { useIntegrationStatus, useConnectPedidosYa, useSync, useDisconnect } from '../hooks/useIntegrations';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import type { DeliveryPlatform } from '../types/integrations';
@@ -19,7 +19,6 @@ export function IntegrationsPage() {
   const { user, refetchUser } = useAuth();
   const { data: status, isLoading } = useIntegrationStatus();
   const connectMutation = useConnectPedidosYa();
-  const verifyOTPMutation = useVerifyOTP();
   const syncMutation = useSync();
   const disconnectMutation = useDisconnect();
 
@@ -57,7 +56,7 @@ export function IntegrationsPage() {
     e.preventDefault();
     setError('');
 
-    await verifyOTPMutation.mutateAsync({ email, password, otp });
+    await connectMutation.mutateAsync({ email, password, otpCode: otp });
     setShowOTPModal(false);
     setEmail('');
     setPassword('');
@@ -282,9 +281,9 @@ export function IntegrationsPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={verifyOTPMutation.isPending}
+                  disabled={connectMutation.isPending}
                 >
-                  {verifyOTPMutation.isPending ? 'Verificando...' : 'Verificar'}
+                  {connectMutation.isPending ? 'Verificando...' : 'Verificar'}
                 </Button>
               </DialogFooter>
             </form>

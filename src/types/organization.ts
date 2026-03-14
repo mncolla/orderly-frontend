@@ -41,11 +41,34 @@ export interface OrganizationSettings {
   objectives: OrganizationObjective[];
 }
 
+export interface OrganizationOwner {
+  id: string;
+  email: string;
+  name: string;
+  role: 'OWNER' | 'AGENCY' | 'ADMIN';
+}
+
+export interface OrganizationStore {
+  id: string;
+  name: string;
+  platform: string;
+  platformId: string;
+  country?: string;
+  createdAt: string;
+  updatedAt: string;
+  _count?: {
+    orders: number;
+    items: number;
+    categories: number;
+  };
+}
+
 export interface Organization {
   id: string;
   name: string;
   country: string;
   ownerId: string;
+  owner?: OrganizationOwner;
   settings?: OrganizationSettings;
   commissionRate?: number;
   markup?: number;
@@ -53,10 +76,12 @@ export interface Organization {
   onboardingCompleted: boolean;
   createdAt: string;
   updatedAt: string;
+  stores?: OrganizationStore[];
   _count?: {
     stores: number;
     expenses: number;
     suggestions: number;
+    orders?: number;
   };
 }
 

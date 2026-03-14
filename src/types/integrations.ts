@@ -21,6 +21,7 @@ export interface DeliveryStatusResponse {
 export interface PedidosYaConnectRequest {
   email: string;
   password: string;
+  otpCode?: string; // Optional OTP code for verification
 }
 
 export interface PedidosYaCredential {
