@@ -14,10 +14,7 @@ import { SuggestionsPage } from './pages/SuggestionsPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { IntegrationsPage } from './pages/IntegrationsPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { AgencyDashboard } from './pages/AgencyDashboard';
-import { AgencyOrganizationsPage } from './pages/AgencyOrganizationsPage';
-import { AgencyOrganizationDetailPage } from './pages/AgencyOrganizationDetailPage';
-import { CreateSuggestionPage } from './pages/CreateSuggestionPage';
+import { AgencyPage } from './pages/AgencyPage';
 import { useEffect, useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
 
@@ -120,39 +117,11 @@ function App() {
               </OnboardingGuard>
             </ProtectedRoute>
           </Route>
-          {/* Agency Routes */}
+          {/* Agency Routes - Simplificadas a una sola página */}
           <Route path="/agency">
             <ProtectedRoute>
               <DashboardLayout>
-                <AgencyDashboard />
-              </DashboardLayout>
-            </ProtectedRoute>
-          </Route>
-          <Route path="/agency/organizations">
-            <ProtectedRoute>
-              <DashboardLayout>
-                <AgencyOrganizationsPage />
-              </DashboardLayout>
-            </ProtectedRoute>
-          </Route>
-          <Route path="/agency/organizations/:id">
-            <ProtectedRoute>
-              <DashboardLayout>
-                <AgencyOrganizationDetailPage />
-              </DashboardLayout>
-            </ProtectedRoute>
-          </Route>
-          <Route path="/agency/suggestions">
-            <ProtectedRoute>
-              <DashboardLayout>
-                <SuggestionsPage />
-              </DashboardLayout>
-            </ProtectedRoute>
-          </Route>
-          <Route path="/agency/suggestions/create">
-            <ProtectedRoute>
-              <DashboardLayout>
-                <CreateSuggestionPage />
+                <AgencyPage />
               </DashboardLayout>
             </ProtectedRoute>
           </Route>

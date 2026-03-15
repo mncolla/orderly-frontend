@@ -46,7 +46,7 @@ export function IntegrationsPage() {
 
       // Recargar usuario y redirigir al onboarding si es necesario
       await refetchUser?.();
-      if (user?.role === 'OWNER' && !user?.organization?.onboardingCompleted) {
+      if (user?.role === 'OWNER' && (!user?.integrations || user.integrations.length === 0)) {
         navigate('/onboarding', { transition: true });
       }
     }
@@ -64,7 +64,7 @@ export function IntegrationsPage() {
 
     // Recargar usuario y redirigir al onboarding si es necesario
     await refetchUser?.();
-    if (user?.role === 'OWNER' && !user?.organization?.onboardingCompleted) {
+    if (user?.role === 'OWNER' && (!user?.integrations || user.integrations.length === 0)) {
       navigate('/onboarding', { transition: true });
     }
   };
@@ -128,7 +128,7 @@ export function IntegrationsPage() {
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                           {isConnected ? (
                             <>
-                              {connection?.email} · Última sync: {formatLastSync(connection?.lastValidatedAt)}
+                              {connection?.email} · Última sync: {formatLastSync(connection?.lastSyncAt || undefined)}
                             </>
                           ) : (
                             'No conectado'

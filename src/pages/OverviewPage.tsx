@@ -7,7 +7,7 @@ import { ObjectivesCard } from '@/components/ObjectivesCard';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DatePickerWithRange } from '@/components/DatePIckerWIthRange';
 import { type DateRange } from 'react-day-picker';
-import { organizationsService } from '../services/organizationsService';
+import { platformIntegrationsService } from '../services/platformIntegrationsService';
 
 export function OverviewPage() {
   const { user } = useAuth();
@@ -26,11 +26,13 @@ export function OverviewPage() {
 
   // Cargar objetivos del usuario
   useEffect(() => {
-    if (user?.organization?.id) {
-      organizationsService.getById(user.organization.id).then((response) => {
-        if (response.organization.settings?.objectives) {
-          setObjectives(response.organization.settings.objectives);
-        }
+    if (user?.integrations && user.integrations.length > 0) {
+      // Obtener la primera integración (los owners típicamente tienen una sola)
+      const integrationId = user.integrations[0].id;
+      platformIntegrationsService.getById(integrationId).then(() => {
+        // Por ahora, no hay objetivos en la nueva estructura
+        // Se pueden agregar más tarde si es necesario
+        setObjectives([]);
       });
     }
   }, [user]);
@@ -196,7 +198,7 @@ export function OverviewPage() {
         </div>
 
         {/* Objectives Card */}
-        {user?.organization && (
+        {user?.integrations && user.integrations.length > 0 && (
           <div className="mb-8">
             <ObjectivesCard objectives={objectives} />
           </div>

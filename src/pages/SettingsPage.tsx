@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Save, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { organizationsService } from '../services/organizationsService';
+import { platformIntegrationsService } from '../services/platformIntegrationsService';
 import type { OrganizationCosts, OrganizationObjective } from '../types/organization';
 import { objectiveTypeLabels, ObjectiveType, ObjectiveUnit } from '../types/organization';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,15 +28,19 @@ export function SettingsPage() {
 
   // Cargar configuración actual
   useEffect(() => {
-    if (user?.organization?.id) {
-      organizationsService.getById(user.organization.id).then((response) => {
-        const org = response.organization;
-        if (org.settings?.costs) {
-          setCosts(org.settings.costs);
-        }
-        if (org.settings?.objectives) {
-          setObjectives(org.settings.objectives);
-        }
+    if (user?.integrations && user.integrations.length > 0) {
+      const integrationId = user.integrations[0].id;
+      platformIntegrationsService.getById(integrationId).then(() => {
+        // Por ahora, no hay settings en la nueva estructura
+        // Se pueden cargar valores por defecto si es necesario
+        setCosts({
+          platformCommission: 15,
+          markup: 30,
+          fixedCosts: 0,
+          variableCosts: 0,
+          costOfGoods: 0,
+        });
+        setObjectives([]);
       });
     }
   }, [user]);
@@ -63,12 +67,15 @@ export function SettingsPage() {
   };
 
   const handleSave = async () => {
-    if (!user?.organization?.id) return;
+    if (!user?.integrations || user.integrations.length === 0) return;
+
+    const integrationId = user.integrations[0].id;
 
     setIsLoading(true);
     setSaveSuccess(false);
     try {
-      await organizationsService.updateSettings(user.organization.id, {
+      // Completar onboarding con los settings actuales
+      await platformIntegrationsService.completeOnboarding(integrationId, {
         costs,
         objectives,
       });
@@ -84,7 +91,7 @@ export function SettingsPage() {
     }
   };
 
-  if (!user?.organization) {
+  if (!user?.integrations || user.integrations.length === 0) {
     return (
       <main className="py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">

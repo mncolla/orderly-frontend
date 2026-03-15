@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { ChevronRight, ChevronLeft, Check, Store, Loader2 } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
-import { organizationsService } from '../services/organizationsService';
+import { platformIntegrationsService } from '../services/platformIntegrationsService';
 import { useConnectPedidosYa } from '../hooks/useIntegrations';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,14 +16,13 @@ type DeliveryPlatform = 'PEDIDOS_YA' | 'RAPPI' | 'GLOVO' | 'UBER_EATS';
 
 export function OnboardingWizard() {
   const [, navigate] = useLocation();
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const { user, refetchUser } = useAuth();
   const [currentStep, setCurrentStep] = useState<Step>('platform');
   const [isLoading, setIsLoading] = useState(false);
 
   // Platform connection states
   const [selectedPlatform, setSelectedPlatform] = useState<DeliveryPlatform>('PEDIDOS_YA');
-  const [createdOrganization, setCreatedOrganization] = useState<any>(null);
+  const [createdIntegration, setCreatedIntegration] = useState<any>(null);
   const [connectionEmail, setConnectionEmail] = useState('');
   const [connectionPassword, setConnectionPassword] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -93,9 +91,9 @@ export function OnboardingWizard() {
         setNeedsOTP(true);
       } else {
         // Connection successful without OTP
-        setCreatedOrganization(response.organization);
-        // Invalidate user query cache to get the organization
-        await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+        setCreatedIntegration(response.integration);
+        // Recargar usuario para obtener la integración
+        await refetchUser();
         setCurrentStep('costs');
       }
     } catch (error: any) {
@@ -120,10 +118,10 @@ export function OnboardingWizard() {
         otpCode: otpCode, // Send OTP code to the same /connect endpoint
       });
 
-      setCreatedOrganization(response.organization);
+      setCreatedIntegration(response.integration);
       setNeedsOTP(false);
-      // Invalidate user query cache to get the organization
-      await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+      // Recargar usuario para obtener la integración
+      await refetchUser();
       setCurrentStep('costs');
     } catch (error: any) {
       setConnectionError(error.message || 'Código incorrecto. Intenta nuevamente.');
@@ -132,31 +130,38 @@ export function OnboardingWizard() {
   };
 
   const handleSubmit = async () => {
-    if (!createdOrganization?.id && !user?.organization?.id) {
-      console.error('No organization found');
-      return;
+    // Obtener la integración ya sea de la que acabamos de crear o de las integraciones del usuario
+    let integrationId = createdIntegration?.id;
+
+    if (!integrationId && user?.integrations && user.integrations.length > 0) {
+      integrationId = user.integrations[0].id;
     }
 
-    const organizationId = createdOrganization?.id || user?.organization?.id;
+    if (!integrationId) {
+      console.error('No platform integration found');
+      alert('Error: No se encontró ninguna integración de plataforma. Por favor conecta una plataforma primero.');
+      return;
+    }
 
     setIsLoading(true);
     try {
       // Complete onboarding
-      await organizationsService.completeOnboarding(organizationId, {
+      await platformIntegrationsService.completeOnboarding(integrationId, {
         costs,
         objectives,
       });
 
-      // Invalidate user query cache and refetch
-      await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+      // Recargar usuario explícitamente
+      await refetchUser();
 
-      // Wait a moment for the query to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait a moment para asegurar que el usuario se actualizó
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       // Navigate to overview
       navigate('/overview');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error completing onboarding:', error);
+      alert(error.message || 'Error al completar el onboarding. Por favor intenta nuevamente.');
     } finally {
       setIsLoading(false);
     }
@@ -174,7 +179,7 @@ export function OnboardingWizard() {
               </p>
             </div>
 
-            {createdOrganization ? (
+            {createdIntegration ? (
               // Show success state after connection
               <div className="space-y-4">
                 <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10">
@@ -186,17 +191,17 @@ export function OnboardingWizard() {
                       <div>
                         <p className="font-semibold text-green-900 dark:text-green-100">¡Conectado exitosamente!</p>
                         <p className="text-sm text-green-700 dark:text-green-300">
-                          Organización creada: {createdOrganization.name}
+                          Plataforma conectada: {createdIntegration.platform}
                         </p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {createdOrganization.stores && (
+                {createdIntegration.stores && createdIntegration.stores.length > 0 && (
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <Store className="h-4 w-4" />
-                    <span>Se detectaron {createdOrganization.stores.total || 0} locales</span>
+                    <span>Se detectaron {createdIntegration.stores.length} locales</span>
                   </div>
                 )}
               </div>
@@ -537,7 +542,7 @@ export function OnboardingWizard() {
 
   const canGoNext = () => {
     if (currentStep === 'platform') {
-      return createdOrganization !== null;
+      return createdIntegration !== null;
     }
     if (currentStep === 'costs') {
       return costs.platformCommission >= 0 && costs.markup >= 0 && costs.fixedCosts >= 0;

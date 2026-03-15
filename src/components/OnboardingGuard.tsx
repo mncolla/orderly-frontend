@@ -12,11 +12,11 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Redirigir al onboarding si es OWNER y no ha completado el onboarding
+    // Redirigir al onboarding si es OWNER y no tiene integraciones conectadas
     // Permitir acceso a /onboarding y /integrations (para conectar primero)
     const isOnboardingPage = location === '/onboarding';
     const isIntegrationsPage = location === '/integrations';
-    const needsOnboarding = user?.role === 'OWNER' && !user?.organization?.onboardingCompleted;
+    const needsOnboarding = user?.role === 'OWNER' && (!user?.integrations || user.integrations.length === 0);
 
     if (needsOnboarding && !isOnboardingPage && !isIntegrationsPage) {
       navigate('/onboarding', { transition: true });

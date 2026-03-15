@@ -7,11 +7,11 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
-  organization?: {
+  integrations?: Array<{
     id: string;
-    name: string;
-    onboardingCompleted: boolean;
-  };
+    platform: string;
+    connected: boolean;
+  }>;
   createdAt: string;
   updatedAt: string;
 }

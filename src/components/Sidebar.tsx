@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'wouter';
-import { BarChart3, ShoppingBag, Utensils, Megaphone, Lightbulb, LogOut, Calendar, Settings as SettingsIcon, Building2, Users } from 'lucide-react';
+import { BarChart3, ShoppingBag, Utensils, Megaphone, Lightbulb, LogOut, Calendar, Settings as SettingsIcon, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -15,10 +15,8 @@ const ownerSidebarItems = [
 ];
 
 const agencySidebarItems = [
-  { href: '/agency', label: 'Dashboard', icon: BarChart3 },
-  { href: '/agency/organizations', label: 'Organizations', icon: Building2 },
-  { href: '/agency/suggestions', label: 'Suggestions', icon: Lightbulb },
-  { href: '/settings', label: 'Settings', icon: SettingsIcon },
+  { href: '/agency', label: 'Panel de Agencia', icon: Lightbulb },
+  { href: '/settings', label: 'Configuración', icon: SettingsIcon },
 ];
 
 export function Sidebar() {
