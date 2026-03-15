@@ -1,6 +1,5 @@
 import { Router, Route, Redirect } from 'wouter';
 import { AuthProvider } from './contexts/AuthContext';
-import { OrganizationProvider } from './contexts/OrganizationContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { OnboardingGuard } from './components/OnboardingGuard';
 import { Sidebar } from './components/Sidebar';
@@ -47,92 +46,90 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
-      <OrganizationProvider>
-        <Router>
-          <Route path="/login" component={LoginPage} />
-          <Route path="/signup" component={SignupPage} />
-          <Route path="/onboarding">
-            <ProtectedRoute>
-              <OnboardingWizard />
-            </ProtectedRoute>
-          </Route>
-          <Route path="/integrations">
-            <ProtectedRoute>
+      <Router>
+        <Route path="/login" component={LoginPage} />
+        <Route path="/signup" component={SignupPage} />
+        <Route path="/onboarding">
+          <ProtectedRoute>
+            <OnboardingWizard />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/integrations">
+          <ProtectedRoute>
+            <DashboardLayout>
+              <IntegrationsPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/overview">
+          <ProtectedRoute>
+            <OnboardingGuard>
               <DashboardLayout>
-                <IntegrationsPage />
+                <OverviewPage />
               </DashboardLayout>
-            </ProtectedRoute>
-          </Route>
-          <Route path="/overview">
-            <ProtectedRoute>
-              <OnboardingGuard>
-                <DashboardLayout>
-                  <OverviewPage />
-                </DashboardLayout>
-              </OnboardingGuard>
-            </ProtectedRoute>
-          </Route>
-          <Route path="/operations">
-            <ProtectedRoute>
-              <OnboardingGuard>
-                <DashboardLayout>
-                  <OperationsPage />
-                </DashboardLayout>
-              </OnboardingGuard>
-            </ProtectedRoute>
-          </Route>
-          <Route path="/menu">
-            <ProtectedRoute>
-              <OnboardingGuard>
-                <DashboardLayout>
-                  <MenuPage />
-                </DashboardLayout>
-              </OnboardingGuard>
-            </ProtectedRoute>
-          </Route>
-          <Route path="/suggestions">
-            <ProtectedRoute>
-              <OnboardingGuard>
-                <DashboardLayout>
-                  <SuggestionsPage />
-                </DashboardLayout>
-              </OnboardingGuard>
-            </ProtectedRoute>
-          </Route>
-          <Route path="/history">
-            <ProtectedRoute>
-              <OnboardingGuard>
-                <DashboardLayout>
-                  <HistoryPage />
-                </DashboardLayout>
-              </OnboardingGuard>
-            </ProtectedRoute>
-          </Route>
-          <Route path="/settings">
-            <ProtectedRoute>
-              <OnboardingGuard>
-                <DashboardLayout>
-                  <SettingsPage />
-                </DashboardLayout>
-              </OnboardingGuard>
-            </ProtectedRoute>
-          </Route>
-          {/* Agency Routes - Simplificadas a una sola página */}
-          <Route path="/agency">
-            <ProtectedRoute>
+            </OnboardingGuard>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/operations">
+          <ProtectedRoute>
+            <OnboardingGuard>
               <DashboardLayout>
-                <AgencyPage />
+                <OperationsPage />
               </DashboardLayout>
-            </ProtectedRoute>
-          </Route>
+            </OnboardingGuard>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/menu">
+          <ProtectedRoute>
+            <OnboardingGuard>
+              <DashboardLayout>
+                <MenuPage />
+              </DashboardLayout>
+            </OnboardingGuard>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/suggestions">
+          <ProtectedRoute>
+            <OnboardingGuard>
+              <DashboardLayout>
+                <SuggestionsPage />
+              </DashboardLayout>
+            </OnboardingGuard>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/history">
+          <ProtectedRoute>
+            <OnboardingGuard>
+              <DashboardLayout>
+                <HistoryPage />
+              </DashboardLayout>
+            </OnboardingGuard>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/settings">
+          <ProtectedRoute>
+            <OnboardingGuard>
+              <DashboardLayout>
+                <SettingsPage />
+              </DashboardLayout>
+            </OnboardingGuard>
+          </ProtectedRoute>
+        </Route>
+        {/* Agency Routes - Simplificadas a una sola página */}
+        <Route path="/agency">
+          <ProtectedRoute>
+            <DashboardLayout>
+              <AgencyPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        </Route>
 
-          <Route path="/">
-            <ProtectedRoute>
-              <RoleBasedRedirect />
-            </ProtectedRoute>
-          </Route>
-        </Router>
-      </OrganizationProvider>
+        <Route path="/">
+          <ProtectedRoute>
+            <RoleBasedRedirect />
+          </ProtectedRoute>
+        </Route>
+      </Router>
     </AuthProvider>
   );
 }

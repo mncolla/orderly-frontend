@@ -114,14 +114,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Función para recargar el usuario actual
   const refetchUser = async () => {
+    console.log('🔄 refetchUser: Iniciando...');
+
+    // Invalidar el cache y forzar recarga
+    await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+    console.log('🔄 refetchUser: Queries invalidadas');
+
+    // Recargar explícitamente
     const data = await queryClient.fetchQuery({
       queryKey: ['auth', 'me'],
       queryFn: authService.getCurrentUser,
     });
+
+    console.log('🔄 refetchUser: Datos obtenidos:', data);
+
     if (data) {
       setUser(data);
       localStorage.setItem('auth_user', JSON.stringify(data));
+      console.log('🔄 refetchUser: Usuario actualizado en estado y localStorage');
+    } else {
+      console.warn('🔄 refetchUser: No se obtuvieron datos');
     }
+
     return data;
   };
 
