@@ -11,6 +11,8 @@ export interface User {
     id: string;
     platform: string;
     connected: boolean;
+    email?: string;
+    lastSyncAt?: string | null;
   }>;
   createdAt: string;
   updatedAt: string;

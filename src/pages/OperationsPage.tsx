@@ -1,21 +1,45 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Package, X, AlertTriangle, Clock } from 'lucide-react';
 import { useOperations } from '../hooks/useOperations';
-import { type OperationsPeriod } from '../services/operationsService';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PeriodSelector } from '@/components/PeriodSelector';
+import { DatePickerWithRange } from '@/components/DatePIckerWIthRange';
+import { type DateRange } from 'react-day-picker';
 
 export function OperationsPage() {
-  const [period, setPeriod] = useState<OperationsPeriod>('last7days');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [userHasChangedDates, setUserHasChangedDates] = useState(false);
 
-  const { data: operations, isLoading, error } = useOperations({
-    period,
-  });
+  const { data: operations, isLoading, error } = useOperations(
+    userHasChangedDates && dateRange
+      ? {
+          startDate: dateRange.from?.toISOString(),
+          endDate: dateRange.to?.toISOString(),
+        }
+      : { period: 'last7days' }
+  );
+
+  // Sync with backend period on first load
+  useEffect(() => {
+    // Default to last 7 days if not set
+    if (!dateRange && !userHasChangedDates) {
+      const today = new Date();
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 6);
+      setDateRange({ from: sevenDaysAgo, to: today });
+    }
+  }, [dateRange, userHasChangedDates]);
+
+  const handleDateChange = (range: DateRange | undefined) => {
+    if (range) {
+      setDateRange(range);
+      setUserHasChangedDates(true);
+    }
+  };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-gray-600 dark:text-gray-400">Cargando...</div>
+        <div className="text-gray-600 dark:text-gray-400">Loading...</div>
       </div>
     );
   }
@@ -24,7 +48,7 @@ export function OperationsPage() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-red-600 dark:text-red-400">
-          Error al cargar los datos
+          Error loading data
         </div>
       </div>
     );
@@ -32,11 +56,33 @@ export function OperationsPage() {
 
   const metrics = operations?.metrics;
 
-  // Helper para formatear milisegundos a minutos
+  // Calculate total orders in the selected range
+  // Total = Completed (inferred) + Cancelled + Rejected
+  const totalOrders = (metrics?.ordersToday ?? 0) + (metrics?.ordersCancelled ?? 0) + (metrics?.ordersRejected ?? 0);
+  const completedOrders = metrics?.ordersToday ?? 0;
+
+  // Helper to format milliseconds to minutes
   const formatMsToMinutes = (ms: number | null): string => {
     if (!ms) return '0 min';
     const minutes = Math.floor(ms / 60000);
     return `${minutes} min`;
+  };
+
+  // Calculate date range label for KPIs
+  const getDateRangeLabel = () => {
+    if (!dateRange?.from) return 'Orders';
+
+    const from = dateRange.from;
+    const to = dateRange.to || from;
+
+    const isSameDay = from.toDateString() === to.toDateString();
+    const isToday = from.toDateString() === new Date().toDateString();
+
+    if (isToday && isSameDay) {
+      return 'Total Orders';
+    }
+
+    return 'Total Orders';
   };
 
   return (
@@ -47,18 +93,18 @@ export function OperationsPage() {
           <div className="">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Operations</h1>
             <p className="mt-2 text-gray-600 dark:text-gray-400">
-              Métricas operativas en tiempo real
+              Real-time operational metrics
             </p>
           </div>
-          <PeriodSelector
-            value={period}
-            onChange={setPeriod}
+          <DatePickerWithRange
+            value={dateRange}
+            onChange={handleDateChange}
           />
         </div>
 
         {/* KPIs Grid */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          {/* Orders Today */}
+          {/* Total Orders */}
           <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
             <div className="p-5">
               <div className="flex items-center">
@@ -66,9 +112,14 @@ export function OperationsPage() {
                   <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Orders Today</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {getDateRangeLabel()}
+                  </p>
                   <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                    {metrics?.ordersToday ?? 0}
+                    {totalOrders}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {completedOrders} completed
                   </p>
                 </div>
               </div>
@@ -83,10 +134,15 @@ export function OperationsPage() {
                   <X className="h-6 w-6 text-red-600 dark:text-red-400" />
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Orders Cancelled</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Cancelled</p>
                   <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
                     {metrics?.ordersCancelled ?? 0}
                   </p>
+                  {totalOrders > 0 && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {((metrics?.ordersCancelled ?? 0) / totalOrders * 100).toFixed(1)}% of total
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -100,10 +156,15 @@ export function OperationsPage() {
                   <AlertTriangle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Orders Rejected</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Rejected</p>
                   <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
                     {metrics?.ordersRejected ?? 0}
                   </p>
+                  {totalOrders > 0 && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {((metrics?.ordersRejected ?? 0) / totalOrders * 100).toFixed(1)}% of total
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -117,9 +178,12 @@ export function OperationsPage() {
                   <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Delayed Orders</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Delayed</p>
                   <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
                     {metrics?.delayedOrdersPct ?? 0}%
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    &gt;30 min prep time
                   </p>
                 </div>
               </div>
@@ -127,38 +191,36 @@ export function OperationsPage() {
           </div>
         </div>
 
-        {/* Tiempos */}
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg mb-8">
-          <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Tiempos</h3>
+        {/* Time Metrics */}
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-5 mb-8">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Time Metrics</h3>
           </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Prep Time */}
-              <div className="text-center">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Prep Time (avg)</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {formatMsToMinutes(metrics?.avgPrepTime ?? null)}
-                </p>
-              </div>
+          <div className="grid grid-cols-2 gap-6 mt-4">
+            {/* Prep Time */}
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Prep Time (avg)</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {formatMsToMinutes(metrics?.avgPrepTime ?? null)}
+              </p>
+            </div>
 
-              {/* Acceptance Time */}
-              <div className="text-center">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Order Acceptance Time</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {formatMsToMinutes(metrics?.orderAcceptanceTime ?? null)}
-                </p>
-              </div>
+            {/* Acceptance Time */}
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Acceptance Time</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {formatMsToMinutes(metrics?.orderAcceptanceTime ?? null)}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Cancelaciones Table */}
+        {/* Cancellations Table */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-          <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Cancelaciones</h3>
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Cancellations</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Sirve para detectar stock-outs y problemas operativos
+              Helps detect stock-outs and operational issues
             </p>
           </div>
           <div className="p-6">
@@ -180,7 +242,7 @@ export function OperationsPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={2} className="text-center text-gray-500 dark:text-gray-400">
-                      No hay datos de cancelaciones
+                      No cancellation data available
                     </TableCell>
                   </TableRow>
                 )}

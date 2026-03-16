@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Megaphone, CheckCircle2, RefreshCw, Loader2 } from 'lucide-react';
-import { useLocation } from 'wouter';
 import { useAuth } from '../contexts/AuthContext';
-import { useIntegrationStatus, useConnectPedidosYa, useSync, useDisconnect } from '../hooks/useIntegrations';
+import { useConnectPedidosYa, useDisconnect } from '../hooks/useIntegrations';
+import { platformIntegrationsService, type SyncProgress } from '../services/platformIntegrationsService';
+import { SyncProgressDisplay } from '../components/SyncProgress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import type { DeliveryPlatform } from '../types/integrations';
@@ -15,19 +16,62 @@ const platformNames: Record<DeliveryPlatform, string> = {
 };
 
 export function IntegrationsPage() {
-  const [, navigate] = useLocation();
   const { user, refetchUser } = useAuth();
-  const { data: status, isLoading } = useIntegrationStatus();
   const connectMutation = useConnectPedidosYa();
-  const syncMutation = useSync();
   const disconnectMutation = useDisconnect();
 
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [showOTPModal, setShowOTPModal] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncingPlatform, setSyncingPlatform] = useState<DeliveryPlatform | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
+
+  // Sync states
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStarted, setSyncStarted] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
+  const [syncError, setSyncError] = useState('');
+
+  // Polling effect for sync progress
+  useEffect(() => {
+    if (!syncStarted || !isSyncing || !syncingPlatform) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const result = await platformIntegrationsService.getSyncProgress(syncingPlatform);
+
+        if (result.status === 'no_sync_in_progress') {
+          setIsSyncing(false);
+          return;
+        }
+
+        if (result.progress) {
+          setSyncProgress(result.progress);
+
+          // Check if all steps are completed
+          const allCompleted = result.progress.steps.every(step => step.status === 'completed');
+          if (allCompleted) {
+            setIsSyncing(false);
+            setSyncStarted(false);
+            // Close modal after a short delay
+            setTimeout(() => {
+              setShowSyncModal(false);
+              setSyncProgress(null);
+              // Refresh user data to get updated lastSyncAt
+              refetchUser?.();
+            }, 1500);
+          }
+        }
+      } catch (error: any) {
+        console.error('Error polling sync progress:', error);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [syncStarted, isSyncing, syncingPlatform, refetchUser]);
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,11 +88,8 @@ export function IntegrationsPage() {
       setEmail('');
       setPassword('');
 
-      // Recargar usuario y redirigir al onboarding si es necesario
+      // Recargar usuario
       await refetchUser?.();
-      if (user?.role === 'OWNER' && (!user?.integrations || user.integrations.length === 0)) {
-        navigate('/onboarding', { transition: true });
-      }
     }
   };
 
@@ -62,19 +103,30 @@ export function IntegrationsPage() {
     setPassword('');
     setOtp('');
 
-    // Recargar usuario y redirigir al onboarding si es necesario
+    // Recargar usuario y auto-start sync
     await refetchUser?.();
-    if (user?.role === 'OWNER' && (!user?.integrations || user.integrations.length === 0)) {
-      navigate('/onboarding', { transition: true });
-    }
   };
 
-  const handleSync = async (platform: DeliveryPlatform) => {
-    await syncMutation.mutateAsync(platform);
+  const handleStartSync = async (platform: DeliveryPlatform) => {
+    setSyncError('');
+    setSyncingPlatform(platform);
+    setIsSyncing(true);
+    setSyncStarted(true);
+    setShowSyncModal(true);
+
+    try {
+      const result = await platformIntegrationsService.startSegmentedSync(platform);
+      setSyncProgress(result.progress);
+    } catch (error: any) {
+      setSyncError(error.message || 'Error al iniciar la sincronización');
+      setIsSyncing(false);
+      setSyncStarted(false);
+    }
   };
 
   const handleDisconnect = async (platform: DeliveryPlatform) => {
     await disconnectMutation.mutateAsync(platform);
+    await refetchUser?.();
   };
 
   const formatLastSync = (date?: string) => {
@@ -88,16 +140,8 @@ export function IntegrationsPage() {
     return new Date(date).toLocaleDateString();
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-      </div>
-    );
-  }
-
   const platforms: DeliveryPlatform[] = ['PEDIDOS_YA', 'RAPPI', 'GLOVO', 'UBER_EATS'];
-  const connections = status?.connections || [];
+  const connections = user?.integrations || [];
 
   return (
     <main className="py-6 sm:px-6 lg:px-8">
@@ -111,7 +155,7 @@ export function IntegrationsPage() {
 
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
           <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Plataformas Conectadas</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Plataformas</h3>
           </div>
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {platforms.map((platform) => {
@@ -144,19 +188,26 @@ export function IntegrationsPage() {
                             Conectado
                           </span>
                           <button
-                            onClick={() => handleSync(platform)}
-                            disabled={syncMutation.isPending}
-                            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50"
+                            onClick={() => handleStartSync(platform)}
+                            disabled={isSyncing}
+                            className="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 disabled:opacity-50 flex items-center gap-1"
                           >
-                            {syncMutation.isPending ? (
-                              <Loader2 className="h-5 w-5 animate-spin" />
+                            {isSyncing && syncingPlatform === platform ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Sincronizando...
+                              </>
                             ) : (
-                              <RefreshCw className="h-5 w-5" />
+                              <>
+                                <RefreshCw className="h-4 w-4" />
+                                Sincronizar
+                              </>
                             )}
                           </button>
                           <button
                             onClick={() => handleDisconnect(platform)}
-                            className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400"
+                            disabled={isSyncing}
+                            className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 disabled:opacity-50"
                           >
                             Desconectar
                           </button>
@@ -287,6 +338,41 @@ export function IntegrationsPage() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Sync Progress Modal */}
+        <Dialog open={showSyncModal} onOpenChange={setShowSyncModal}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Sincronizando {syncingPlatform && platformNames[syncingPlatform]}</DialogTitle>
+              <DialogDescription>
+                Sincronizando locales, menú e historial de órdenes
+              </DialogDescription>
+            </DialogHeader>
+            <SyncProgressDisplay syncProgress={syncProgress} syncError={syncError} />
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (!syncProgress?.steps.every(s => s.status === 'completed')) {
+                    // Allow closing only if sync completed or failed
+                    if (syncError || syncProgress?.steps.some(s => s.status === 'failed')) {
+                      setShowSyncModal(false);
+                      setSyncProgress(null);
+                      setSyncError('');
+                    }
+                  } else {
+                    setShowSyncModal(false);
+                    setSyncProgress(null);
+                  }
+                }}
+                disabled={isSyncing && !syncError}
+              >
+                {syncProgress?.steps.every(s => s.status === 'completed') ? 'Cerrar' : 'Sincronizando...'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

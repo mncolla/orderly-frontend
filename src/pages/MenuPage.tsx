@@ -1,6 +1,64 @@
-import { Utensils, Star, TrendingDown, DollarSign } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Utensils, Star, TrendingDown, DollarSign, Loader2 } from 'lucide-react';
+import { storesService } from '../services/storesService';
+import { Card, CardContent } from '@/components/ui/card';
+import { MenuTable } from '@/components/menu/MenuTable';
 
 export function MenuPage() {
+  const { data: storesData, isLoading } = useQuery({
+    queryKey: ['stores'],
+    queryFn: storesService.list,
+  });
+
+  // Calcular métricas
+  const allStoreItems = storesData?.stores?.flatMap((store) =>
+    store.storeItems
+      .filter((si) => si.active)
+      .map((si) => ({
+        ...si.item,
+        price: si.price,
+        active: si.active,
+        storeName: store.name,
+        categoryName: store.storeCategories.find((sc) => sc.categoryId === si.item.categoryId)?.category.name || 'Uncategorized',
+      }))
+  ) || [];
+
+  const activeItems = allStoreItems;
+  const totalItems = activeItems.length;
+  const avgPrice = totalItems > 0
+    ? activeItems.reduce((sum, item) => sum + Number(item.price), 0) / totalItems
+    : 0;
+
+  if (isLoading) {
+    return (
+      <main className="py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!storesData?.stores || storesData.stores.length === 0) {
+    return (
+      <main className="py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          <div className="text-center py-12">
+            <Utensils className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              No hay datos de menú
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              Conecta una plataforma y sincroniza tus datos para ver tu menú.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="py-6 sm:px-6 lg:px-8">
       <div className="px-4 py-6 sm:px-0">
@@ -13,8 +71,8 @@ export function MenuPage() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-            <div className="p-5">
+          <Card>
+            <CardContent className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <Utensils className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -22,47 +80,33 @@ export function MenuPage() {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Items</dt>
-                    <dd className="text-lg font-medium text-gray-900 dark:text-white">48</dd>
+                    <dd className="text-lg font-medium text-gray-900 dark:text-white">{totalItems}</dd>
                   </dl>
                 </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-            <div className="p-5">
+          <Card>
+            <CardContent className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <Star className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Top Sellers</dt>
-                    <dd className="text-lg font-medium text-gray-900 dark:text-white">12</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Categories</dt>
+                    <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                      {storesData.stores.reduce((sum, store) => sum + store._count.storeCategories, 0)}
+                    </dd>
                   </dl>
                 </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <TrendingDown className="h-6 w-6 text-red-600 dark:text-red-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Low Performers</dt>
-                    <dd className="text-lg font-medium text-gray-900 dark:text-white">5</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-            <div className="p-5">
+          <Card>
+            <CardContent className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
@@ -70,95 +114,38 @@ export function MenuPage() {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Avg. Price</dt>
-                    <dd className="text-lg font-medium text-gray-900 dark:text-white">$18.50</dd>
+                    <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                      ${avgPrice.toFixed(2)}
+                    </dd>
                   </dl>
                 </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <TrendingDown className="h-6 w-6 text-red-600 dark:text-red-400" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Stores</dt>
+                    <dd className="text-lg font-medium text-gray-900 dark:text-white">{storesData.count}</dd>
+                  </dl>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Top Performing Items */}
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg mb-8">
-          <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Top Performing Items</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Item Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Orders
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Revenue
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Trend
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    Signature Burger
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    Main Course
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    342
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    $6,158
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
-                    ↑ 12%
-                  </td>
-                </tr>
-                <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    Caesar Salad
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    Starters
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    289
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    $4,334
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
-                    ↑ 8%
-                  </td>
-                </tr>
-                <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    Chocolate Cake
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    Desserts
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    256
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    $3,840
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400">
-                    ↓ 3%
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        {/* Menu Table */}
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Menu Items
+          </h2>
+          <MenuTable stores={storesData.stores} />
         </div>
       </div>
     </main>
