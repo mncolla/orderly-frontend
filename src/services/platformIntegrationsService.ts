@@ -45,4 +45,58 @@ export const platformIntegrationsService = {
     const response = await api.get(`/platform-integrations/${integrationId}`);
     return response as { integration: PlatformIntegration };
   },
+
+  /**
+   * POST /api/delivery/:platform/sync/start
+   * Iniciar sincronización segmentada
+   */
+  startSegmentedSync: async (platform: string): Promise<{
+    message: string;
+    integrationId: string;
+    progress: SyncProgress;
+  }> => {
+    const response = await api.post(`/delivery/${platform}/sync/start`, {});
+    return response as {
+      message: string;
+      integrationId: string;
+      progress: SyncProgress;
+    };
+  },
+
+  /**
+   * GET /api/delivery/:platform/sync/progress
+   * Obtener progreso de sincronización
+   */
+  getSyncProgress: async (platform: string): Promise<{
+    integrationId: string;
+    platform: string;
+    status: string;
+    progress?: SyncProgress;
+  }> => {
+    const response = await api.get(`/delivery/${platform}/sync/progress`);
+    return response as {
+      integrationId: string;
+      platform: string;
+      status: string;
+      progress?: SyncProgress;
+    };
+  },
 };
+
+export interface SyncStep {
+  step: 'stores' | 'menu' | 'orders';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  progress: number;
+  total: number;
+  message: string;
+}
+
+export interface SyncProgress {
+  integrationId: string;
+  platform: string;
+  currentStep: number;
+  totalSteps: number;
+  steps: SyncStep[];
+  startedAt: string;
+  completedAt?: string;
+}

@@ -38,10 +38,17 @@ export interface Restaurant {
 
 export interface PedidosYaConnectResponse {
   message: string;
-  integration?: PlatformIntegration;
+  platform?: string;
+  integration?: PlatformIntegration & {
+    stores?: StoreInfo[];
+  };
   restaurants?: Restaurant[];
   needsOTP?: boolean;
   tempToken?: string;
+  stores?: {
+    total: number;
+    byChainName: Record<string, number>;
+  };
 }
 
 export interface VerifyOTPRequest {

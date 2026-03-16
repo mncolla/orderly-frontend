@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { ChevronRight, ChevronLeft, Check, Store, Loader2 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check, Store, Loader2, UtensilsCrossed, ShoppingCart, Home } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { platformIntegrationsService } from '../services/platformIntegrationsService';
+import { platformIntegrationsService, type SyncProgress } from '../services/platformIntegrationsService';
 import { useConnectPedidosYa } from '../hooks/useIntegrations';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,8 +29,49 @@ export function OnboardingWizard() {
   const [needsOTP, setNeedsOTP] = useState(false);
   const [connectionError, setConnectionError] = useState('');
 
+  // Sync states
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStarted, setSyncStarted] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
+  const [syncError, setSyncError] = useState('');
+
   // Mutation for platform connection (used for both connect and verify-otp)
   const connectMutation = useConnectPedidosYa();
+
+  // Polling effect for sync progress
+  useEffect(() => {
+    if (!syncStarted || !isSyncing) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const result = await platformIntegrationsService.getSyncProgress(selectedPlatform);
+
+        if (result.status === 'no_sync_in_progress') {
+          setIsSyncing(false);
+          return;
+        }
+
+        if (result.progress) {
+          setSyncProgress(result.progress);
+
+          // Check if all steps are completed
+          const allCompleted = result.progress.steps.every(step => step.status === 'completed');
+          if (allCompleted) {
+            setIsSyncing(false);
+            setSyncStarted(false);
+            // Auto-navigate to costs step after a short delay
+            setTimeout(() => {
+              setCurrentStep('costs');
+            }, 1000);
+          }
+        }
+      } catch (error: any) {
+        console.error('Error polling sync progress:', error);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [syncStarted, isSyncing, selectedPlatform]);
 
   // Step 1: Costs
   const [costs, setCosts] = useState<OrganizationCosts>({
@@ -71,6 +112,21 @@ export function OnboardingWizard() {
     setObjectives(newObjectives);
   };
 
+  const handleStartSync = async () => {
+    setSyncError('');
+    setIsSyncing(true);
+    setSyncStarted(true);
+
+    try {
+      const result = await platformIntegrationsService.startSegmentedSync(selectedPlatform);
+      setSyncProgress(result.progress);
+    } catch (error: any) {
+      setSyncError(error.message || 'Error al iniciar la sincronización');
+      setIsSyncing(false);
+      setSyncStarted(false);
+    }
+  };
+
   // Platform connection handlers
   const handleConnectPlatform = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,7 +150,7 @@ export function OnboardingWizard() {
         setCreatedIntegration(response.integration);
         // Recargar usuario para obtener la integración
         await refetchUser();
-        setCurrentStep('costs');
+        // NO avanzar automáticamente - mostrar pantalla de sincronización
       }
     } catch (error: any) {
       setConnectionError(error.message || 'Error al conectar. Verifica tus credenciales.');
@@ -122,7 +178,7 @@ export function OnboardingWizard() {
       setNeedsOTP(false);
       // Recargar usuario para obtener la integración
       await refetchUser();
-      setCurrentStep('costs');
+      // NO avanzar automáticamente - mostrar pantalla de sincronización
     } catch (error: any) {
       setConnectionError(error.message || 'Código incorrecto. Intenta nuevamente.');
       console.error('OTP verification error:', error);
@@ -182,26 +238,150 @@ export function OnboardingWizard() {
             {createdIntegration ? (
               // Show success state after connection
               <div className="space-y-4">
-                <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                        <Check className="h-6 w-6 text-green-600 dark:text-green-400" />
+                {!syncStarted ? (
+                  <>
+                    <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                            <Check className="h-6 w-6 text-green-600 dark:text-green-400" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-green-900 dark:text-green-100">¡Conectado exitosamente!</p>
+                            <p className="text-sm text-green-700 dark:text-green-300">
+                              Plataforma conectada: {createdIntegration.platform}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {createdIntegration.stores && createdIntegration.stores.length > 0 && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <Store className="h-4 w-4" />
+                        <span>Se detectaron {createdIntegration.stores.length} locales</span>
                       </div>
-                      <div>
-                        <p className="font-semibold text-green-900 dark:text-green-100">¡Conectado exitosamente!</p>
+                    )}
+
+                    <Button
+                      onClick={handleStartSync}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700"
+                      size="lg"
+                    >
+                      <Store className="h-4 w-4 mr-2" />
+                      Sincronizar Datos
+                    </Button>
+
+                    <Button
+                      onClick={() => setCurrentStep('costs')}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      Configurar primero y sincronizar después
+                    </Button>
+
+                    <p className="text-xs text-gray-500 text-center">
+                      Sincroniza tus locales, menú e historial de órdenes para obtener análisis completos
+                    </p>
+                  </>
+                ) : (
+                  // Sync progress UI
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <h4 className="font-semibold text-lg">Sincronizando datos...</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Esto puede tomar unos minutos
+                      </p>
+                    </div>
+
+                    {/* Sync Steps */}
+                    <div className="space-y-3">
+                      {syncProgress?.steps.map((step) => {
+                        const StepIcon = step.step === 'stores' ? Home :
+                                        step.step === 'menu' ? UtensilsCrossed :
+                                        ShoppingCart;
+
+                        return (
+                          <Card key={step.step} className={`border-2 transition-all ${
+                            step.status === 'completed' ? 'border-green-500 dark:border-green-600' :
+                            step.status === 'in_progress' ? 'border-indigo-500 dark:border-indigo-600' :
+                            step.status === 'failed' ? 'border-red-500 dark:border-red-600' :
+                            'border-gray-200 dark:border-gray-700'
+                          }`}>
+                            <CardContent className="pt-4">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                  step.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30' :
+                                  step.status === 'in_progress' ? 'bg-indigo-100 dark:bg-indigo-900/30' :
+                                  step.status === 'failed' ? 'bg-red-100 dark:bg-red-900/30' :
+                                  'bg-gray-100 dark:bg-gray-800'
+                                }`}>
+                                  {step.status === 'completed' ? (
+                                    <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                  ) : step.status === 'in_progress' ? (
+                                    <Loader2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400 animate-spin" />
+                                  ) : step.status === 'failed' ? (
+                                    <span className="text-red-600 dark:text-red-400">✕</span>
+                                  ) : (
+                                    <StepIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                                  )}
+                                </div>
+
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="font-medium">
+                                      {step.step === 'stores' ? 'Locales' :
+                                       step.step === 'menu' ? 'Menú (Categorías + Productos)' :
+                                       'Órdenes'}
+                                    </span>
+                                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                                      {step.progress}/{step.total}
+                                    </span>
+                                  </div>
+
+                                  {/* Progress bar */}
+                                  {step.status === 'in_progress' || step.status === 'completed' ? (
+                                    <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                      <div
+                                        className={`h-full transition-all ${
+                                          step.status === 'completed' ? 'bg-green-500' : 'bg-indigo-500'
+                                        }`}
+                                        style={{ width: `${(step.progress / step.total) * 100}%` }}
+                                      />
+                                    </div>
+                                  ) : null}
+
+                                  {/* Message */}
+                                  {step.message && (
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                      {step.message}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+
+                    {/* Sync error */}
+                    {syncError && (
+                      <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                        <p className="text-sm text-red-800 dark:text-red-200">{syncError}</p>
+                      </div>
+                    )}
+
+                    {/* All completed message */}
+                    {syncProgress?.steps.every(s => s.status === 'completed') && (
+                      <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <Check className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
+                        <p className="font-semibold text-green-900 dark:text-green-100">¡Sincronización completada!</p>
                         <p className="text-sm text-green-700 dark:text-green-300">
-                          Plataforma conectada: {createdIntegration.platform}
+                          Redirigiendo al siguiente paso...
                         </p>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {createdIntegration.stores && createdIntegration.stores.length > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Store className="h-4 w-4" />
-                    <span>Se detectaron {createdIntegration.stores.length} locales</span>
+                    )}
                   </div>
                 )}
               </div>
