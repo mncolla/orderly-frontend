@@ -73,6 +73,14 @@ export function OnboardingWizard() {
     return () => clearInterval(pollInterval);
   }, [syncStarted, isSyncing, selectedPlatform]);
 
+  // Auto-start sync when connection is successful
+  useEffect(() => {
+    if (createdIntegration && !syncStarted) {
+      // Start sync automatically after connection
+      handleStartSync();
+    }
+  }, [createdIntegration]);
+
   // Step 1: Costs
   const [costs, setCosts] = useState<OrganizationCosts>({
     platformCommission: 15,
@@ -263,26 +271,12 @@ export function OnboardingWizard() {
                       </div>
                     )}
 
-                    <Button
-                      onClick={handleStartSync}
-                      className="w-full bg-indigo-600 hover:bg-indigo-700"
-                      size="lg"
-                    >
-                      <Store className="h-4 w-4 mr-2" />
-                      Sincronizar Datos
-                    </Button>
-
-                    <Button
-                      onClick={() => setCurrentStep('costs')}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      Configurar primero y sincronizar después
-                    </Button>
-
-                    <p className="text-xs text-gray-500 text-center">
-                      Sincroniza tus locales, menú e historial de órdenes para obtener análisis completos
-                    </p>
+                    <div className="text-center py-4">
+                      <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mx-auto mb-3" />
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Iniciando sincronización automática...
+                      </p>
+                    </div>
                   </>
                 ) : (
                   // Sync progress UI
