@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Store } from '@/services/storesService';
+import type { MenuItem } from '@/services/menuService';
 import {
   Table,
   TableBody,
@@ -12,83 +12,23 @@ import { Badge } from '@/components/ui/badge';
 import { StoresPopover, type StoreInfo } from './StoresPopover';
 import { ImageModal } from './ImageModal';
 
-export interface UniqueMenuItem {
-  id: string;
-  name: string;
-  description: string | null;
-  imageUrl: string | null;
-  categoryName: string;
-  stores: StoreInfo[];
-  storeCount: number;
-  minPrice: number;
-  maxPrice: number;
-}
-
 interface MenuTableProps {
-  stores: Store[];
+  items: MenuItem[];
 }
 
-export function MenuTable({ stores }: MenuTableProps) {
-  const uniqueItems = useMemo(() => {
-    const itemMap = new Map<string, UniqueMenuItem>();
-
-    stores.forEach((store) => {
-      store.storeItems
-        .filter((si) => si.active)
-        .forEach((storeItem) => {
-          const item = storeItem.item;
-          const category = store.storeCategories.find(
-            (sc) => sc.categoryId === item.categoryId
-          )?.category;
-
-          const storeInfo: StoreInfo = {
-            id: store.id,
-            name: store.name,
-            price: Number(storeItem.price),
-          };
-
-          if (!itemMap.has(item.id)) {
-            itemMap.set(item.id, {
-              id: item.id,
-              name: item.name,
-              description: item.description,
-              imageUrl: item.imageUrl,
-              categoryName: category?.name || 'Uncategorized',
-              stores: [storeInfo],
-              storeCount: 1,
-              minPrice: storeInfo.price,
-              maxPrice: storeInfo.price,
-            });
-          } else {
-            const existing = itemMap.get(item.id)!;
-            existing.stores.push(storeInfo);
-            existing.storeCount++;
-            existing.minPrice = Math.min(existing.minPrice, storeInfo.price);
-            existing.maxPrice = Math.max(existing.maxPrice, storeInfo.price);
-          }
-        });
-    });
-
-    return Array.from(itemMap.values()).sort((a, b) => {
-      if (a.categoryName !== b.categoryName) {
-        return a.categoryName.localeCompare(b.categoryName);
-      }
-      return a.name.localeCompare(b.name);
-    });
-  }, [stores]);
-
-  const formatPrice = (item: UniqueMenuItem): string => {
+export function MenuTable({ items }: MenuTableProps) {
+  const formatPrice = (item: MenuItem): string => {
     if (item.minPrice === item.maxPrice) {
       return `$${item.minPrice.toFixed(2)}`;
     }
     return `$${item.minPrice.toFixed(2)} - $${item.maxPrice.toFixed(2)}`;
   };
 
-  if (uniqueItems.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500 dark:text-gray-400">
-          No active menu items found. Sync your stores to see menu items.
+          No menu items found. Sync your stores to see menu items.
         </p>
       </div>
     );
@@ -111,7 +51,7 @@ export function MenuTable({ stores }: MenuTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {uniqueItems.map((item) => (
+          {items.map((item) => (
             <TableRow key={item.id}>
               <TableCell className="hidden sm:table-cell">
                 {item.imageUrl ? (
@@ -139,7 +79,7 @@ export function MenuTable({ stores }: MenuTableProps) {
                 {formatPrice(item)}
               </TableCell>
               <TableCell>
-                <StoresPopover stores={item.stores} storeCount={item.storeCount} />
+                <StoresPopover stores={item.stores as StoreInfo[]} storeCount={item.storeCount} />
               </TableCell>
               <TableCell>
                 <ImageModal imageUrl={item.imageUrl} itemName={item.name} />
