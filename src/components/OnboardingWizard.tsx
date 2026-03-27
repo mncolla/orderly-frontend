@@ -8,11 +8,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { OrganizationCosts, OrganizationObjective } from '../types/organization';
+import type { OrganizationObjective } from '../types/organization';
 import { objectiveTypeLabels, objectiveUnitLabels, ObjectiveType, ObjectiveUnit } from '../types/organization';
 
-type Step = 'platform' | 'costs' | 'objectives' | 'summary';
+type Step = 'platform' | 'defaultConfig' | 'storeConfig' | 'objectives' | 'summary';
 type DeliveryPlatform = 'PEDIDOS_YA' | 'RAPPI' | 'GLOVO' | 'UBER_EATS';
+
+interface StoreWithConfig {
+  id: string;
+  name: string;
+  chainName: string;
+  city: string | null;
+  country: string | null;
+  useCustomConfig: boolean;
+  config?: {
+    platformCommission?: number;
+    markupPercentage?: number;
+    costOfGoods?: number;
+    fixedMonthlyCosts?: number;
+    packagingCost?: number;
+    deliveryCost?: number;
+  };
+}
 
 export function OnboardingWizard() {
   const [, navigate] = useLocation();
@@ -59,9 +76,9 @@ export function OnboardingWizard() {
           if (allCompleted) {
             setIsSyncing(false);
             setSyncStarted(false);
-            // Auto-navigate to costs step after a short delay
+            // Auto-navigate to defaultConfig step after a short delay
             setTimeout(() => {
-              setCurrentStep('costs');
+              setCurrentStep('defaultConfig');
             }, 1000);
           }
         }
@@ -81,14 +98,34 @@ export function OnboardingWizard() {
     }
   }, [createdIntegration]);
 
-  // Step 1: Costs
-  const [costs, setCosts] = useState<OrganizationCosts>({
+  // Default configuration (Step 2)
+  const [defaultConfig, setDefaultConfig] = useState({
     platformCommission: 15,
-    markup: 30,
-    fixedCosts: 0,
-    variableCosts: 0,
-    costOfGoods: 0,
+    markupPercentage: 30,
+    costOfGoods: 30,
+    fixedMonthlyCosts: 0,
+    packagingCost: 0,
+    deliveryCost: 0,
   });
+
+  // Store configurations (Step 3)
+  const [storesWithConfig, setStoresWithConfig] = useState<StoreWithConfig[]>([]);
+
+  // Initialize store configs when integration is created
+  useEffect(() => {
+    if (createdIntegration?.stores && createdIntegration.stores.length > 0) {
+      const stores = createdIntegration.stores.map((store: any) => ({
+        id: store.id,
+        name: store.name,
+        chainName: store.chainName,
+        city: store.city,
+        country: store.country,
+        useCustomConfig: false,
+        config: {},
+      }));
+      setStoresWithConfig(stores);
+    }
+  }, [createdIntegration]);
 
   // Step 2: Objectives
   const [objectives, setObjectives] = useState<OrganizationObjective[]>([
@@ -193,6 +230,34 @@ export function OnboardingWizard() {
     }
   };
 
+  const toggleStoreCustomConfig = (storeId: string) => {
+    setStoresWithConfig(storesWithConfig.map(store => {
+      if (store.id === storeId) {
+        return {
+          ...store,
+          useCustomConfig: !store.useCustomConfig,
+          config: !store.useCustomConfig ? { ...defaultConfig } : {},
+        };
+      }
+      return store;
+    }));
+  };
+
+  const updateStoreConfig = (storeId: string, field: string, value: number | null) => {
+    setStoresWithConfig(storesWithConfig.map(store => {
+      if (store.id === storeId) {
+        return {
+          ...store,
+          config: {
+            ...store.config,
+            [field]: value !== null ? value : undefined,
+          },
+        };
+      }
+      return store;
+    }));
+  };
+
   const handleSubmit = async () => {
     // Obtener la integración ya sea de la que acabamos de crear o de las integraciones del usuario
     let integrationId = createdIntegration?.id;
@@ -209,10 +274,28 @@ export function OnboardingWizard() {
 
     setIsLoading(true);
     try {
+      // Build store configs array for stores with custom config
+      const storeConfigs = storesWithConfig
+        .filter(store => store.useCustomConfig)
+        .map(store => ({
+          storeId: store.id,
+          ...store.config,
+        }));
+
+      // Map defaultConfig to costs format for backward compatibility
+      const costsForBackend = {
+        platformCommission: defaultConfig.platformCommission,
+        markup: defaultConfig.markupPercentage,
+        fixedCosts: defaultConfig.fixedMonthlyCosts,
+        variableCosts: defaultConfig.packagingCost + defaultConfig.deliveryCost,
+        costOfGoods: defaultConfig.costOfGoods,
+      };
+
       // Complete onboarding
       await platformIntegrationsService.completeOnboarding(integrationId, {
-        costs,
+        costs: costsForBackend,
         objectives,
+        storeConfigs: storeConfigs.length > 0 ? storeConfigs : undefined,
       });
 
       // Recargar usuario explícitamente
@@ -518,24 +601,24 @@ export function OnboardingWizard() {
           </div>
         );
 
-      case 'costs':
+      case 'defaultConfig':
         return (
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-semibold">Configuración de Gastos</h3>
+              <h3 className="text-lg font-semibold">Configuración Predeterminada</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Define los costos de tu operación para calcular márgenes reales
+                Estos valores se aplicarán a todos tus locales. Podrás personalizar locales individuales en el siguiente paso.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="platformCommission">Comisión de Plataforma (%)</Label>
+                <Label htmlFor="defaultPlatformCommission">Comisión de Plataforma (%)</Label>
                 <Input
-                  id="platformCommission"
+                  id="defaultPlatformCommission"
                   type="number"
-                  value={costs.platformCommission}
-                  onChange={(e) => setCosts({ ...costs, platformCommission: Number(e.target.value) })}
+                  value={defaultConfig.platformCommission}
+                  onChange={(e) => setDefaultConfig({ ...defaultConfig, platformCommission: Number(e.target.value) })}
                   min="0"
                   max="100"
                 />
@@ -543,12 +626,12 @@ export function OnboardingWizard() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="markup">Markup (%)</Label>
+                <Label htmlFor="defaultMarkup">Markup (%)</Label>
                 <Input
-                  id="markup"
+                  id="defaultMarkup"
                   type="number"
-                  value={costs.markup}
-                  onChange={(e) => setCosts({ ...costs, markup: Number(e.target.value) })}
+                  value={defaultConfig.markupPercentage}
+                  onChange={(e) => setDefaultConfig({ ...defaultConfig, markupPercentage: Number(e.target.value) })}
                   min="0"
                   max="100"
                 />
@@ -556,28 +639,181 @@ export function OnboardingWizard() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="fixedCosts">Costos Fijos Mensuales ($)</Label>
+                <Label htmlFor="defaultCostOfGoods">CMV - Costo de Mercadería (%)</Label>
                 <Input
-                  id="fixedCosts"
+                  id="defaultCostOfGoods"
                   type="number"
-                  value={costs.fixedCosts}
-                  onChange={(e) => setCosts({ ...costs, fixedCosts: Number(e.target.value) })}
+                  value={defaultConfig.costOfGoods}
+                  onChange={(e) => setDefaultConfig({ ...defaultConfig, costOfGoods: Number(e.target.value) })}
+                  min="0"
+                  max="100"
+                />
+                <p className="text-xs text-gray-500">Costo de insumos como % del precio de venta</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="defaultFixedCosts">Costos Fijos Mensuales ($)</Label>
+                <Input
+                  id="defaultFixedCosts"
+                  type="number"
+                  value={defaultConfig.fixedMonthlyCosts}
+                  onChange={(e) => setDefaultConfig({ ...defaultConfig, fixedMonthlyCosts: Number(e.target.value) })}
                   min="0"
                 />
                 <p className="text-xs text-gray-500">Alquiler, servicios, sueldos</p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="variableCosts">Costos Variables ($)</Label>
+                <Label htmlFor="defaultPackagingCost">Costo de Packaging ($)</Label>
                 <Input
-                  id="variableCosts"
+                  id="defaultPackagingCost"
                   type="number"
-                  value={costs.variableCosts || 0}
-                  onChange={(e) => setCosts({ ...costs, variableCosts: Number(e.target.value) })}
+                  value={defaultConfig.packagingCost}
+                  onChange={(e) => setDefaultConfig({ ...defaultConfig, packagingCost: Number(e.target.value) })}
                   min="0"
                 />
-                <p className="text-xs text-gray-500">Packaging, delivery (si aplica)</p>
+                <p className="text-xs text-gray-500">Empaquetado por pedido</p>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="defaultDeliveryCost">Costo de Delivery ($)</Label>
+                <Input
+                  id="defaultDeliveryCost"
+                  type="number"
+                  value={defaultConfig.deliveryCost}
+                  onChange={(e) => setDefaultConfig({ ...defaultConfig, deliveryCost: Number(e.target.value) })}
+                  min="0"
+                />
+                <p className="text-xs text-gray-500">Costo de envío por pedido</p>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'storeConfig':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold">Configuración por Local</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Se detectaron {storesWithConfig.length} locales. Puedes personalizar la configuración de cada uno individualmente.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {storesWithConfig.map((store) => (
+                <Card key={store.id} className={`border-2 transition-all ${
+                  store.useCustomConfig ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/10' : 'border-gray-200 dark:border-gray-700'
+                }`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h4 className="font-semibold text-lg">{store.name}</h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {store.chainName}
+                          {store.city && ` • ${store.city}`}
+                          {store.country && ` • ${store.country}`}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleStoreCustomConfig(store.id)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                          store.useCustomConfig
+                            ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {store.useCustomConfig ? 'Personalizado' : 'Usar valores predeterminados'}
+                      </button>
+                    </div>
+
+                    {store.useCustomConfig && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <div className="space-y-2">
+                          <Label>Comisión de Plataforma (%)</Label>
+                          <Input
+                            type="number"
+                            value={(store.config?.platformCommission ?? defaultConfig.platformCommission) ?? 0}
+                            onChange={(e) => updateStoreConfig(store.id, 'platformCommission', Number(e.target.value))}
+                            min="0"
+                            max="100"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Markup (%)</Label>
+                          <Input
+                            type="number"
+                            value={(store.config?.markupPercentage ?? defaultConfig.markupPercentage) ?? 0}
+                            onChange={(e) => updateStoreConfig(store.id, 'markupPercentage', Number(e.target.value))}
+                            min="0"
+                            max="100"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>CMV - Costo de Mercadería (%)</Label>
+                          <Input
+                            type="number"
+                            value={(store.config?.costOfGoods ?? defaultConfig.costOfGoods) ?? 0}
+                            onChange={(e) => updateStoreConfig(store.id, 'costOfGoods', Number(e.target.value))}
+                            min="0"
+                            max="100"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Costos Fijos Mensuales ($)</Label>
+                          <Input
+                            type="number"
+                            value={(store.config?.fixedMonthlyCosts ?? defaultConfig.fixedMonthlyCosts) ?? 0}
+                            onChange={(e) => updateStoreConfig(store.id, 'fixedMonthlyCosts', Number(e.target.value))}
+                            min="0"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Costo de Packaging ($)</Label>
+                          <Input
+                            type="number"
+                            value={(store.config?.packagingCost ?? defaultConfig.packagingCost) ?? 0}
+                            onChange={(e) => updateStoreConfig(store.id, 'packagingCost', Number(e.target.value))}
+                            min="0"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Costo de Delivery ($)</Label>
+                          <Input
+                            type="number"
+                            value={(store.config?.deliveryCost ?? defaultConfig.deliveryCost) ?? 0}
+                            onChange={(e) => updateStoreConfig(store.id, 'deliveryCost', Number(e.target.value))}
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="text-center">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setStoresWithConfig(storesWithConfig.map(store => ({
+                    ...store,
+                    useCustomConfig: false,
+                    config: {},
+                  })));
+                }}
+                className="text-gray-600 dark:text-gray-400"
+              >
+                Restablecer todos a valores predeterminados
+              </Button>
             </div>
           </div>
         );
@@ -670,29 +906,72 @@ export function OnboardingWizard() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Costos Configurados</CardTitle>
+                <CardTitle className="text-base">Configuración Predeterminada</CardTitle>
+                <CardDescription>Estos valores se aplican a todos los locales</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex justify-between">
                   <span>Comisión de plataforma:</span>
-                  <span className="font-medium">{costs.platformCommission}%</span>
+                  <span className="font-medium">{defaultConfig.platformCommission}%</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Markup:</span>
-                  <span className="font-medium">{costs.markup}%</span>
+                  <span className="font-medium">{defaultConfig.markupPercentage}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>CMV:</span>
+                  <span className="font-medium">{defaultConfig.costOfGoods}%</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Costos fijos:</span>
-                  <span className="font-medium">${costs.fixedCosts.toLocaleString()}</span>
+                  <span className="font-medium">${defaultConfig.fixedMonthlyCosts.toLocaleString()}</span>
                 </div>
-                {costs.variableCosts && (
-                  <div className="flex justify-between">
-                    <span>Costos variables:</span>
-                    <span className="font-medium">${costs.variableCosts.toLocaleString()}</span>
-                  </div>
-                )}
+                <div className="flex justify-between">
+                  <span>Costo de packaging:</span>
+                  <span className="font-medium">${defaultConfig.packagingCost.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Costo de delivery:</span>
+                  <span className="font-medium">${defaultConfig.deliveryCost.toLocaleString()}</span>
+                </div>
               </CardContent>
             </Card>
+
+            {storesWithConfig.filter(s => s.useCustomConfig).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Locales con Configuración Personalizada</CardTitle>
+                  <CardDescription>
+                    {storesWithConfig.filter(s => s.useCustomConfig).length} de {storesWithConfig.length} locales
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {storesWithConfig.filter(s => s.useCustomConfig).map((store) => (
+                    <div key={store.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <h4 className="font-medium mb-2">{store.name}</h4>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Comisión:</span>
+                          <span className="font-medium">{(store.config?.platformCommission ?? defaultConfig.platformCommission) ?? 0}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Markup:</span>
+                          <span className="font-medium">{(store.config?.markupPercentage ?? defaultConfig.markupPercentage) ?? 0}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">CMV:</span>
+                          <span className="font-medium">{(store.config?.costOfGoods ?? defaultConfig.costOfGoods) ?? 0}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Costos fijos:</span>
+                          <span className="font-medium">${((store.config?.fixedMonthlyCosts ?? defaultConfig.fixedMonthlyCosts) ?? 0).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
@@ -718,8 +997,8 @@ export function OnboardingWizard() {
     if (currentStep === 'platform') {
       return createdIntegration !== null;
     }
-    if (currentStep === 'costs') {
-      return costs.platformCommission >= 0 && costs.markup >= 0 && costs.fixedCosts >= 0;
+    if (currentStep === 'defaultConfig') {
+      return defaultConfig.platformCommission >= 0 && defaultConfig.markupPercentage >= 0;
     }
     if (currentStep === 'objectives') {
       return objectives.length > 0 && objectives.every(o => o.target > 0);
@@ -730,9 +1009,10 @@ export function OnboardingWizard() {
   const getCurrentStepNumber = () => {
     switch (currentStep) {
       case 'platform': return 1;
-      case 'costs': return 2;
-      case 'objectives': return 3;
-      case 'summary': return 4;
+      case 'defaultConfig': return 2;
+      case 'storeConfig': return 3;
+      case 'objectives': return 4;
+      case 'summary': return 5;
     }
   };
 
@@ -742,10 +1022,10 @@ export function OnboardingWizard() {
         <CardHeader>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
-              {[1, 2, 3, 4].map((step) => (
+              {[1, 2, 3, 4, 5].map((step) => (
                 <div
                   key={step}
-                  className={`flex items-center ${step < 4 ? 'flex-1' : ''}`}
+                  className={`flex items-center ${step < 5 ? 'flex-1' : ''}`}
                 >
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
@@ -758,7 +1038,7 @@ export function OnboardingWizard() {
                   >
                     {getCurrentStepNumber() > step ? <Check className="h-4 w-4" /> : step}
                   </div>
-                  {step < 4 && (
+                  {step < 5 && (
                     <div className="flex-1 h-1 mx-2 bg-gray-200 dark:bg-gray-700">
                       <div
                         className={`h-full transition-all ${
@@ -774,14 +1054,16 @@ export function OnboardingWizard() {
           </div>
 
           <CardTitle className="text-2xl">
-            {currentStep === 'platform' && 'Paso 1 de 4'}
-            {currentStep === 'costs' && 'Paso 2 de 4'}
-            {currentStep === 'objectives' && 'Paso 3 de 4'}
-            {currentStep === 'summary' && 'Paso 4 de 4'}
+            {currentStep === 'platform' && 'Paso 1 de 5'}
+            {currentStep === 'defaultConfig' && 'Paso 2 de 5'}
+            {currentStep === 'storeConfig' && 'Paso 3 de 5'}
+            {currentStep === 'objectives' && 'Paso 4 de 5'}
+            {currentStep === 'summary' && 'Paso 5 de 5'}
           </CardTitle>
           <CardDescription>
             {currentStep === 'platform' && 'Conecta una plataforma de delivery'}
-            {currentStep === 'costs' && 'Configura los gastos de tu operación'}
+            {currentStep === 'defaultConfig' && 'Configura los valores predeterminados'}
+            {currentStep === 'storeConfig' && 'Personaliza la configuración por local'}
             {currentStep === 'objectives' && 'Define tus objetivos de negocio'}
             {currentStep === 'summary' && 'Confirma tu configuración'}
           </CardDescription>
@@ -794,8 +1076,9 @@ export function OnboardingWizard() {
             <Button
               variant="outline"
               onClick={() => {
-                if (currentStep === 'costs') setCurrentStep('platform');
-                if (currentStep === 'objectives') setCurrentStep('costs');
+                if (currentStep === 'defaultConfig') setCurrentStep('platform');
+                if (currentStep === 'storeConfig') setCurrentStep('defaultConfig');
+                if (currentStep === 'objectives') setCurrentStep('storeConfig');
                 if (currentStep === 'summary') setCurrentStep('objectives');
               }}
               disabled={currentStep === 'platform'}
@@ -807,8 +1090,9 @@ export function OnboardingWizard() {
             {currentStep !== 'summary' ? (
               <Button
                 onClick={() => {
-                  if (currentStep === 'platform') setCurrentStep('costs');
-                  if (currentStep === 'costs') setCurrentStep('objectives');
+                  if (currentStep === 'platform') setCurrentStep('defaultConfig');
+                  if (currentStep === 'defaultConfig') setCurrentStep('storeConfig');
+                  if (currentStep === 'storeConfig') setCurrentStep('objectives');
                   if (currentStep === 'objectives') setCurrentStep('summary');
                 }}
                 disabled={!canGoNext()}

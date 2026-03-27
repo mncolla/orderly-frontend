@@ -2,15 +2,24 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../services/api';
 import { weatherService, type ForecastData } from '@/services/weatherService';
-import type { SuggestionType, SuggestionTypeConfig, DeliveryPlatform } from '@/types/integrations';
+import { storesService } from '../services/storesService';
+import type { SuggestionType, SuggestionTypeConfig, DeliveryPlatform, StoreConfig, ConfigSource } from '@/types/integrations';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { CheckCircle, XCircle, Clock, TrendingUp, Sparkles, DollarSign, Percent, Timer, Edit3, Store, Zap, Package, Star } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, TrendingUp, Sparkles, DollarSign, Percent, Timer, Edit3, Store, Zap, Package, Star, Settings, Loader2, Save, AlertCircle, BarChart3, Activity, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Cloud, CloudRain, Sun, Snowflake, Wind, Droplets, Thermometer } from 'lucide-react';
 
 type SuggestionStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'APPLIED';
@@ -267,6 +276,23 @@ export function AgencyPage() {
     featuredDuration: '',
   });
 
+  // Store config modal state
+  const [isStoreConfigModalOpen, setIsStoreConfigModalOpen] = useState(false);
+  const [isLoadingStoreConfig, setIsLoadingStoreConfig] = useState(false);
+  const [isSavingStoreConfig, setIsSavingStoreConfig] = useState(false);
+  const [storeConfigData, setStoreConfigData] = useState<{
+    config: StoreConfig;
+    source: ConfigSource;
+  } | null>(null);
+  const [storeConfigForm, setStoreConfigForm] = useState<StoreConfig>({
+    platformCommission: null,
+    markupPercentage: null,
+    costOfGoods: null,
+    fixedMonthlyCosts: null,
+    packagingCost: null,
+    deliveryCost: null,
+  });
+
   // Obtener clima de la store seleccionada
   const { data: weatherForecast, isLoading: weatherLoading } = useQuery({
     queryKey: ['weather-forecast', selectedStoreId],
@@ -474,6 +500,86 @@ export function AgencyPage() {
       console.error('Error loading suggestions:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Open store config modal and load config
+  const openStoreConfigModal = async () => {
+    if (!selectedStoreId || !selectedUserId) return;
+
+    setIsLoadingStoreConfig(true);
+    setIsStoreConfigModalOpen(true);
+
+    try {
+      const configData = await storesService.getAgencyStoreConfig(selectedUserId, selectedStoreId);
+      setStoreConfigData(configData);
+      setStoreConfigForm(configData.config);
+    } catch (error) {
+      console.error('Error loading store config:', error);
+    } finally {
+      setIsLoadingStoreConfig(false);
+    }
+  };
+
+  // Save store config
+  const saveStoreConfig = async () => {
+    if (!selectedStoreId || !selectedUserId) return;
+
+    setIsSavingStoreConfig(true);
+
+    try {
+      // Convert StoreConfig to update request (only include non-null values)
+      const updateData: Record<string, number> = {};
+      if (storeConfigForm.platformCommission !== null) updateData.platformCommission = storeConfigForm.platformCommission;
+      if (storeConfigForm.markupPercentage !== null) updateData.markupPercentage = storeConfigForm.markupPercentage;
+      if (storeConfigForm.fixedMonthlyCosts !== null) updateData.fixedMonthlyCosts = storeConfigForm.fixedMonthlyCosts;
+      if (storeConfigForm.packagingCost !== null) updateData.packagingCost = storeConfigForm.packagingCost;
+      if (storeConfigForm.deliveryCost !== null) updateData.deliveryCost = storeConfigForm.deliveryCost;
+      if (storeConfigForm.costOfGoods !== null) updateData.costOfGoods = storeConfigForm.costOfGoods;
+
+      if (storeConfigData?.source === 'store') {
+        // Update existing config
+        await storesService.updateAgencyStoreConfig(selectedUserId, selectedStoreId, updateData);
+      } else {
+        // Create new config
+        await storesService.updateAgencyStoreConfig(selectedUserId, selectedStoreId, updateData);
+      }
+
+      // Reload config
+      const configResponse = await storesService.getAgencyStoreConfig(selectedUserId, selectedStoreId);
+      setStoreConfigData(configResponse);
+      setIsStoreConfigModalOpen(false);
+    } catch (error) {
+      console.error('Error saving store config:', error);
+    } finally {
+      setIsSavingStoreConfig(false);
+    }
+  };
+
+  // Reset store to defaults
+  const resetStoreToDefaults = async () => {
+    if (!selectedStoreId || !selectedUserId) return;
+
+    setIsSavingStoreConfig(true);
+
+    try {
+      await storesService.updateAgencyStoreConfig(selectedUserId, selectedStoreId, {
+        platformCommission: undefined,
+        markupPercentage: undefined,
+        costOfGoods: undefined,
+        fixedMonthlyCosts: undefined,
+        packagingCost: undefined,
+        deliveryCost: undefined,
+      });
+
+      // Reload config
+      const configResponse = await storesService.getAgencyStoreConfig(selectedUserId, selectedStoreId);
+      setStoreConfigData(configResponse);
+      setStoreConfigForm(configResponse.config);
+    } catch (error) {
+      console.error('Error resetting store config:', error);
+    } finally {
+      setIsSavingStoreConfig(false);
     }
   };
 
@@ -1360,32 +1466,76 @@ export function AgencyPage() {
               {/* Selector de Store agrupado por chainName */}
               {userStores.length > 0 && (
                 <div>
-                  <Label htmlFor="store-select">Store</Label>
-                  <select
-                    id="store-select"
-                    value={selectedStoreId}
-                    onChange={(e) => {
-                      setSelectedStoreId(e.target.value);
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  >
-                    <option value="">Selecciona una store...</option>
-                    {userStores.map((group) => (
-                      <optgroup key={group.chainName} label={group.chainName}>
-                        {group.stores.map((store) => (
-                          <option key={store.id} value={store.id}>
-                            {store.name} {store.city ? `(${store.city})` : ''}
-                          </option>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <Label htmlFor="store-select">Store</Label>
+                      <select
+                        id="store-select"
+                        value={selectedStoreId}
+                        onChange={(e) => {
+                          setSelectedStoreId(e.target.value);
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      >
+                        <option value="">Selecciona una store...</option>
+                        {userStores.map((group) => (
+                          <optgroup key={group.chainName} label={group.chainName}>
+                            {group.stores.map((store) => (
+                              <option key={store.id} value={store.id}>
+                                {store.name} {store.city ? `(${store.city})` : ''}
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
-                      </optgroup>
-                    ))}
-                  </select>
+                      </select>
+                    </div>
+                    {selectedStoreId && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={openStoreConfigModal}
+                        className="mt-6"
+                        title="Configurar store"
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
 
               {selectedUserId && suggestions.length === 0 && !loading && (
                 <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
                   Este usuario no tiene sugerencias pendientes
+                </div>
+              )}
+
+              {/* Agency Navigation Buttons - Show when user and store are selected */}
+              {selectedUserId && selectedStoreId && (
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                    Ver Métricas del Cliente
+                  </Label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+                      onClick={() => window.location.href = `/overview?agencyView=true&userId=${selectedUserId}&storeId=${selectedStoreId}`}
+                    >
+                      <BarChart3 className="h-4 w-4" />
+                      <span>Dashboard</span>
+                      <ArrowRight className="h-4 w-4 ml-auto" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-2 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 dark:hover:border-green-700 transition-colors"
+                      onClick={() => window.location.href = `/operations?agencyView=true&userId=${selectedUserId}&storeId=${selectedStoreId}`}
+                    >
+                      <Activity className="h-4 w-4" />
+                      <span>Operaciones</span>
+                      <ArrowRight className="h-4 w-4 ml-auto" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -1539,6 +1689,162 @@ export function AgencyPage() {
             </div>
           </div>
         )}
+
+        {/* Store Config Modal */}
+        <Dialog open={isStoreConfigModalOpen} onOpenChange={setIsStoreConfigModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Store className="h-5 w-5" />
+                Configurar: {userStores.flatMap(g => g.stores).find(s => s.id === selectedStoreId)?.name}
+              </DialogTitle>
+              <DialogDescription>
+                {storeConfigData?.source === 'store'
+                  ? 'Edita la configuración personalizada de este local'
+                  : 'Configura valores personalizados para este local. Los campos vacíos usarán los valores predeterminados.'}
+              </DialogDescription>
+            </DialogHeader>
+
+            {isLoadingStoreConfig ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-blue-800 dark:text-blue-200">
+                    {storeConfigData?.source === 'store'
+                      ? 'Este local usa configuración personalizada. Todos los valores definidos aquí reemplazan los valores predeterminados.'
+                      : 'Deja los campos vacíos para usar los valores predeterminados. Solo completa los campos que quieras personalizar.'}
+                  </div>
+                </div>
+
+                {storeConfigData?.source === 'store' && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300">
+                      Personalizado
+                    </Badge>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      Este local tiene configuración personalizada
+                    </span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="agencyStorePlatformCommission">Comisión de Plataforma (%)</Label>
+                    <Input
+                      id="agencyStorePlatformCommission"
+                      type="number"
+                      value={storeConfigForm.platformCommission || ''}
+                      onChange={(e) => setStoreConfigForm({ ...storeConfigForm, platformCommission: Number(e.target.value) || null })}
+                      placeholder="Predeterminado"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="agencyStoreMarkup">Markup (%)</Label>
+                    <Input
+                      id="agencyStoreMarkup"
+                      type="number"
+                      value={storeConfigForm.markupPercentage || ''}
+                      onChange={(e) => setStoreConfigForm({ ...storeConfigForm, markupPercentage: Number(e.target.value) || null })}
+                      placeholder="Predeterminado"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="agencyStoreCostOfGoods">CMV - Costo de Mercadería (%)</Label>
+                    <Input
+                      id="agencyStoreCostOfGoods"
+                      type="number"
+                      value={storeConfigForm.costOfGoods || ''}
+                      onChange={(e) => setStoreConfigForm({ ...storeConfigForm, costOfGoods: Number(e.target.value) || null })}
+                      placeholder="Predeterminado"
+                      min="0"
+                      max="100"
+                    />
+                    <p className="text-xs text-gray-500">Costo de insumos como % del precio</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="agencyStoreFixedCosts">Costos Fijos Mensuales ($)</Label>
+                    <Input
+                      id="agencyStoreFixedCosts"
+                      type="number"
+                      value={storeConfigForm.fixedMonthlyCosts || ''}
+                      onChange={(e) => setStoreConfigForm({ ...storeConfigForm, fixedMonthlyCosts: Number(e.target.value) || null })}
+                      placeholder="Predeterminado"
+                      min="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="agencyStorePackagingCost">Costo de Packaging ($)</Label>
+                    <Input
+                      id="agencyStorePackagingCost"
+                      type="number"
+                      value={storeConfigForm.packagingCost || ''}
+                      onChange={(e) => setStoreConfigForm({ ...storeConfigForm, packagingCost: Number(e.target.value) || null })}
+                      placeholder="Predeterminado"
+                      min="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="agencyStoreDeliveryCost">Costo de Delivery ($)</Label>
+                    <Input
+                      id="agencyStoreDeliveryCost"
+                      type="number"
+                      value={storeConfigForm.deliveryCost || ''}
+                      onChange={(e) => setStoreConfigForm({ ...storeConfigForm, deliveryCost: Number(e.target.value) || null })}
+                      placeholder="Predeterminado"
+                      min="0"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="gap-2">
+              {storeConfigData?.source === 'store' && (
+                <Button
+                  variant="outline"
+                  onClick={resetStoreToDefaults}
+                  disabled={isSavingStoreConfig}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Restablecer a Predeterminados
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setIsStoreConfigModalOpen(false)} disabled={isSavingStoreConfig}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={saveStoreConfig}
+                disabled={isSavingStoreConfig}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                {isSavingStoreConfig ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Guardar
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

@@ -8,20 +8,68 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DatePickerWithRange } from '@/components/DatePIckerWIthRange';
 import { type DateRange } from 'react-day-picker';
 import { platformIntegrationsService } from '../services/platformIntegrationsService';
+import { AgencyContextBanner } from '@/components/AgencyContextBanner';
+import { useLocation } from 'wouter';
 
 export function OverviewPage() {
   const { user } = useAuth();
+  const [location] = useLocation();
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [userHasChangedDates, setUserHasChangedDates] = useState(false);
   const [objectives, setObjectives] = useState<any[]>([]);
 
+  // Parse search params from location
+  const searchParams = new URLSearchParams(location.split('?')[1] || '');
+  const agencyView = searchParams.get('agencyView') === 'true';
+  const agencyUserId = searchParams.get('userId');
+  const agencyStoreId = searchParams.get('storeId');
+
+  const [agencyUserName, setAgencyUserName] = useState<string>('');
+  const [agencyStoreName, setAgencyStoreName] = useState<string>('');
+
+  // Fetch agency user/store info when in agency mode
+  useEffect(() => {
+    if (agencyView && agencyUserId) {
+      // Fetch user info
+      fetch(`/api/auth/users/${agencyUserId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
+      })
+        .then(res => res.json())
+        .then(data => {
+          setAgencyUserName(data.name || '');
+        })
+        .catch(console.error);
+
+      // Fetch store info if storeId provided
+      if (agencyStoreId) {
+        fetch(`/api/stores/${agencyStoreId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+          },
+        })
+          .then(res => res.json())
+          .then(data => {
+            setAgencyStoreName(data.store?.name || '');
+          })
+          .catch(console.error);
+      }
+    }
+  }, [agencyView, agencyUserId, agencyStoreId]);
+
   const { data: overview, isLoading, error } = useOverview(
     userHasChangedDates && dateRange
       ? {
+          storeId: agencyStoreId || undefined,
           startDate: dateRange.from?.toISOString(),
           endDate: dateRange.to?.toISOString(),
         }
-      : {}
+      : {
+          storeId: agencyStoreId || undefined,
+        }
   );
 
   // Cargar objetivos del usuario
@@ -76,8 +124,16 @@ export function OverviewPage() {
   const kpis = overview?.kpis;
 
   return (
-    <main className="py-6 sm:px-6 lg:px-8">
-      <div className="px-4 py-6 sm:px-0">
+    <>
+      {/* Agency Context Banner */}
+      <AgencyContextBanner
+        userName={agencyUserName}
+        storeName={agencyStoreName}
+        currentView="overview"
+      />
+
+      <main className="py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
         {/* Header */}
         <div className="gap-6 mb-6 flex flex-col items-start">
           <div className="">
@@ -313,5 +369,6 @@ export function OverviewPage() {
         </div>
       </div>
     </main>
+    </>
   );
 }
