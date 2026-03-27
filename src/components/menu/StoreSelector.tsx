@@ -134,7 +134,6 @@ export function StoreSelector({
   };
 
   const isAllSelected = filteredStores.length > 0 && selectedStoreIds.length === filteredStores.length;
-  const isSomeSelected = selectedStoreIds.length > 0 && !isAllSelected;
 
   return (
     <Drawer open={open} onOpenChange={setOpen} direction="right">
@@ -243,7 +242,7 @@ export function StoreSelector({
                                 {mode === 'multi' ? (
                                   <Checkbox
                                     checked={isSelected}
-                                    onCheckedChange={(checked) => {
+                                    onCheckedChange={() => {
                                       handleToggleStore(store.id);
                                     }}
                                     aria-label={`Select ${store.name}`}

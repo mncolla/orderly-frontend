@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import type { MenuItem } from '@/services/menuService';
 import {
   Table,

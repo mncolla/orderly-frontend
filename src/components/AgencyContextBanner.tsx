@@ -1,7 +1,6 @@
 import { useLocation } from 'wouter';
 import { Store, User, ArrowLeft, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 
 interface AgencyContextBannerProps {
@@ -17,11 +16,11 @@ export function AgencyContextBanner({
   onViewChange,
   currentView = 'overview'
 }: AgencyContextBannerProps) {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Parse search params from location
-  const searchParams = new URLSearchParams(location.split('?')[1] || '');
+  // Parse search params from window.location (Wouter's useLocation doesn't include query params)
+  const searchParams = new URLSearchParams(window.location.search);
   const agencyView = searchParams.get('agencyView') === 'true';
 
   // Don't render if not in agency mode
@@ -39,11 +38,11 @@ export function AgencyContextBanner({
   };
 
   return (
-    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-900 dark:to-purple-900 text-white">
-      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-3">
+    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-900 dark:to-purple-900 text-white shadow-md border-b border-indigo-700 dark:border-indigo-950">
+      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-2">
         <div className="flex items-center justify-between gap-4">
           {/* Left: Back button + Context info */}
-          <div className="flex items-center gap-4 flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
             <Button
               variant="ghost"
               size="sm"
@@ -57,35 +56,33 @@ export function AgencyContextBanner({
 
             <div className="h-6 w-px bg-white/20" />
 
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-1.5">
-                <User className="h-4 w-4 flex-shrink-0" />
-                <span className="text-sm font-medium truncate">
-                  {userName || 'Cargando...'}
-                </span>
-              </div>
+            <div className="flex items-center gap-2 min-w-0">
+              {userName && (
+                <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-1">
+                  <User className="h-4 w-4 flex-shrink-0" />
+                  <span className="text-sm font-medium truncate">{userName}</span>
+                </div>
+              )}
 
               {storeName && (
                 <>
                   <span className="text-white/40">→</span>
-                  <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-1.5">
+                  <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-1">
                     <Store className="h-4 w-4 flex-shrink-0" />
-                    <span className="text-sm font-medium truncate">
-                      {storeName}
-                    </span>
+                    <span className="text-sm font-medium truncate">{storeName}</span>
                   </div>
                 </>
               )}
             </div>
           </div>
 
-          {/* Right: View switcher + Close */}
+          {/* Right: View switcher */}
           <div className="flex items-center gap-2 flex-shrink-0">
             {/* View switcher tabs */}
-            <div className="hidden md:flex items-center bg-white/10 rounded-lg p-1">
+            <div className="hidden sm:flex items-center bg-white/10 rounded-lg p-0.5">
               <button
                 onClick={() => switchView('overview')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
                   currentView === 'overview'
                     ? 'bg-white text-indigo-600'
                     : 'text-white/80 hover:text-white hover:bg-white/10'
@@ -95,7 +92,7 @@ export function AgencyContextBanner({
               </button>
               <button
                 onClick={() => switchView('operations')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
                   currentView === 'operations'
                     ? 'bg-white text-indigo-600'
                     : 'text-white/80 hover:text-white hover:bg-white/10'
@@ -106,7 +103,7 @@ export function AgencyContextBanner({
             </div>
 
             {/* Mobile dropdown */}
-            <div className="md:hidden relative">
+            <div className="sm:hidden relative">
               <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-1.5 hover:bg-white/20 transition-colors"
@@ -148,12 +145,6 @@ export function AgencyContextBanner({
                 </div>
               )}
             </div>
-
-            <div className="h-6 w-px bg-white/20" />
-
-            <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
-              Vista Agencia
-            </Badge>
           </div>
         </div>
       </div>

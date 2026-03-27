@@ -5,18 +5,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DatePickerWithRange } from '@/components/DatePIckerWIthRange';
 import { type DateRange } from 'react-day-picker';
 import { AgencyContextBanner } from '@/components/AgencyContextBanner';
-import { useLocation } from 'wouter';
 
 export function OperationsPage() {
-  const [location] = useLocation();
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [userHasChangedDates, setUserHasChangedDates] = useState(false);
 
-  // Parse search params from location
-  const searchParams = new URLSearchParams(location.split('?')[1] || '');
+  // Parse search params from window.location (Wouter's useLocation doesn't include query params)
+  const searchParams = new URLSearchParams(window.location.search);
   const agencyView = searchParams.get('agencyView') === 'true';
   const agencyUserId = searchParams.get('userId');
   const agencyStoreId = searchParams.get('storeId');
+
+  // DEBUG
+  console.log('📍 Operations - window.location.href:', window.location.href);
+  console.log('✅ Operations - agencyView:', agencyView);
+  console.log('👤 Operations - agencyUserId:', agencyUserId);
 
   const [agencyUserName, setAgencyUserName] = useState<string>('');
   const [agencyStoreName, setAgencyStoreName] = useState<string>('');
@@ -24,6 +27,8 @@ export function OperationsPage() {
   // Fetch agency user/store info when in agency mode
   useEffect(() => {
     if (agencyView && agencyUserId) {
+      console.log('🔍 Agency mode: fetching user info', { agencyUserId });
+
       // Fetch user info
       fetch(`/api/auth/users/${agencyUserId}`, {
         headers: {
@@ -31,25 +36,47 @@ export function OperationsPage() {
           Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
         },
       })
-        .then(res => res.json())
-        .then(data => {
-          setAgencyUserName(data.name || '');
+        .then(res => {
+          console.log('📡 User API response status:', res.status);
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+          return res.json();
         })
-        .catch(console.error);
+        .then(data => {
+          console.log('✅ User data received:', data);
+          setAgencyUserName(data.name || 'Usuario');
+        })
+        .catch(err => {
+          console.error('❌ Error fetching user:', err);
+          setAgencyUserName('Usuario');
+        });
 
       // Fetch store info if storeId provided
       if (agencyStoreId) {
+        console.log('🔍 Agency mode: fetching store info', { agencyStoreId });
+
         fetch(`/api/stores/${agencyStoreId}`, {
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
           },
         })
-          .then(res => res.json())
-          .then(data => {
-            setAgencyStoreName(data.store?.name || '');
+          .then(res => {
+            console.log('📡 Store API response status:', res.status);
+            if (!res.ok) {
+              throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            return res.json();
           })
-          .catch(console.error);
+          .then(data => {
+            console.log('✅ Store data received:', data);
+            setAgencyStoreName(data.store?.name || 'Store');
+          })
+          .catch(err => {
+            console.error('❌ Error fetching store:', err);
+            setAgencyStoreName('Store');
+          });
       }
     }
   }, [agencyView, agencyUserId, agencyStoreId]);
@@ -143,14 +170,19 @@ export function OperationsPage() {
         currentView="operations"
       />
 
-      <main className="py-6 sm:px-6 lg:px-8">
+      <main className={`${agencyView ? 'pt-0' : 'py-6'} sm:px-6 lg:px-8`}>
         <div className="px-4 py-6 sm:px-0">
         {/* Header */}
         <div className="gap-6 mb-6 flex flex-col items-start">
           <div className="">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Operations</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              {agencyView ? 'Operaciones' : 'Operations'}
+            </h1>
             <p className="mt-2 text-gray-600 dark:text-gray-400">
-              Real-time operational metrics
+              {agencyView && agencyUserName
+                ? `Analizando operaciones de ${agencyUserName}${agencyStoreName ? ` - ${agencyStoreName}` : ''}`
+                : 'Real-time operational metrics'
+              }
             </p>
           </div>
           <DatePickerWithRange
