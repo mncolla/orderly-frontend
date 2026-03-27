@@ -20,7 +20,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Cloud, CloudRain, Sun, Snowflake, Wind, Droplets, Thermometer } from 'lucide-react';
+import { Cloud, CloudRain, Sun, Snowflake, Wind } from 'lucide-react';
 
 type SuggestionStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'APPLIED';
 
@@ -120,118 +120,42 @@ const SUGGESTION_TYPES: SuggestionTypeConfig[] = [
 ];
 
 const weatherIcons: Record<string, React.ReactNode> = {
-  '01d': <Sun className="h-8 w-8 text-yellow-500" />,
-  '01n': <Sun className="h-8 w-8 text-yellow-300" />,
-  '02d': <Cloud className="h-8 w-8 text-gray-400" />,
-  '02n': <Cloud className="h-8 w-8 text-gray-500" />,
-  '03d': <Cloud className="h-8 w-8 text-gray-400" />,
-  '03n': <Cloud className="h-8 w-8 text-gray-500" />,
-  '04d': <Cloud className="h-8 w-8 text-gray-500" />,
-  '04n': <Cloud className="h-8 w-8 text-gray-600" />,
-  '09d': <CloudRain className="h-8 w-8 text-blue-500" />,
-  '09n': <CloudRain className="h-8 w-8 text-blue-600" />,
-  '10d': <CloudRain className="h-8 w-8 text-blue-400" />,
-  '10n': <CloudRain className="h-8 w-8 text-blue-500" />,
-  '11d': <Cloud className="h-8 w-8 text-gray-600" />,
-  '11n': <Cloud className="h-8 w-8 text-gray-700" />,
-  '13d': <Snowflake className="h-8 w-8 text-blue-200" />,
-  '13n': <Snowflake className="h-8 w-8 text-blue-300" />,
-  '50d': <Wind className="h-8 w-8 text-gray-400" />,
-  '50n': <Wind className="h-8 w-8 text-gray-500" />,
+  '01d': <Sun className="h-4 w-4 text-yellow-500" />,
+  '01n': <Sun className="h-4 w-4 text-yellow-300" />,
+  '02d': <Cloud className="h-4 w-4 text-gray-400" />,
+  '02n': <Cloud className="h-4 w-4 text-gray-500" />,
+  '03d': <Cloud className="h-4 w-4 text-gray-400" />,
+  '03n': <Cloud className="h-4 w-4 text-gray-500" />,
+  '04d': <Cloud className="h-4 w-4 text-gray-500" />,
+  '04n': <Cloud className="h-4 w-4 text-gray-600" />,
+  '09d': <CloudRain className="h-4 w-4 text-blue-500" />,
+  '09n': <CloudRain className="h-4 w-4 text-blue-600" />,
+  '10d': <CloudRain className="h-4 w-4 text-blue-400" />,
+  '10n': <CloudRain className="h-4 w-4 text-blue-500" />,
+  '11d': <Cloud className="h-4 w-4 text-gray-600" />,
+  '11n': <Cloud className="h-4 w-4 text-gray-700" />,
+  '13d': <Snowflake className="h-4 w-4 text-blue-200" />,
+  '13n': <Snowflake className="h-4 w-4 text-blue-300" />,
+  '50d': <Wind className="h-4 w-4 text-gray-400" />,
+  '50n': <Wind className="h-4 w-4 text-gray-500" />,
 };
 
-// Componente WeatherForecast
+// Componente WeatherForecast - Minimalista
 function WeatherForecast({ forecast }: { forecast: ForecastData }) {
-  const getDailySummary = (dataPoints: ForecastData['forecast'][0]['dataPoints']) => {
-    const temps = dataPoints.map(d => d.temperature.current);
-    const minTemp = Math.min(...dataPoints.map(d => d.temperature.min));
-    const maxTemp = Math.max(...dataPoints.map(d => d.temperature.max));
-    const avgTemp = temps.reduce((a, b) => a + b, 0) / temps.length;
-    const avgHumidity = dataPoints.reduce((sum, d) => sum + d.atmosphere.humidity, 0) / dataPoints.length;
-    const maxPrecipitation = Math.max(...dataPoints.map(d => d.precipitation.probability));
-
-    const conditions = dataPoints.map(d => d.conditions.main);
-    const modeCondition = conditions.sort((a, b) =>
-      conditions.filter(v => v === a).length - conditions.filter(v => v === b).length
-    )[0];
-
-    const middayIcon = dataPoints.find(d => d.datetime.includes('12:00:00'))?.conditions.icon ||
-                       dataPoints[0]?.conditions.icon;
-
-    return {
-      minTemp,
-      maxTemp,
-      avgTemp,
-      avgHumidity,
-      maxPrecipitation,
-      modeCondition,
-      icon: middayIcon || '01d',
-    };
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
-    } else if (date.toDateString() === tomorrow.toDateString()) {
-      return 'Tomorrow';
-    } else {
-      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    }
-  };
+  const todayData = forecast.forecast[0];
+  const currentTemp = todayData?.dataPoints[0]?.temperature.current || 0;
+  const icon = todayData?.dataPoints[0]?.conditions.icon || '01d';
+  const conditions = todayData?.dataPoints[0]?.conditions.main || 'Clear';
 
   return (
-    <div className="space-y-3">
-      {forecast.forecast.slice(0, 5).map((day) => {
-        const summary = getDailySummary(day.dataPoints);
-
-        return (
-          <div key={day.date} className="flex items-center justify-between p-3 rounded-lg border bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950">
-            <div className="flex items-center gap-4 flex-1">
-              <div className="flex flex-col items-center min-w-[80px]">
-                <span className="text-sm font-medium">{formatDate(day.date)}</span>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {weatherIcons[summary.icon] || <Cloud className="h-8 w-8 text-gray-400" />}
-                <div>
-                  <p className="text-sm capitalize text-muted-foreground">{summary.modeCondition}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {summary.avgHumidity.toFixed(0)}% humidity
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <div className="flex items-center gap-2">
-                    <Thermometer className="h-4 w-4 text-red-500" />
-                    <span className="text-lg font-bold">{Math.round(summary.maxTemp)}°</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <Thermometer className="h-3 w-3 text-blue-500" />
-                    <span className="text-sm">{Math.round(summary.minTemp)}°</span>
-                  </div>
-                </div>
-
-                {summary.maxPrecipitation > 30 && (
-                  <div className="flex items-center gap-1 text-blue-500" title="Precipitation probability">
-                    <Droplets className="h-4 w-4" />
-                    <span className="text-sm font-medium">{Math.round(summary.maxPrecipitation)}%</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })}
+    <div className="flex items-center gap-3">
+      {weatherIcons[icon] || <Cloud className="h-4 w-4 text-gray-400" />}
+      <span className="text-lg font-semibold text-gray-900 dark:text-white">
+        {Math.round(currentTemp)}°
+      </span>
+      <span className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+        {conditions}
+      </span>
     </div>
   );
 }
@@ -244,6 +168,10 @@ export function AgencyPage() {
   const [selectedStoreId, setSelectedStoreId] = useState<string>('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Autocomplete state
+  const [userSearchQuery, setUserSearchQuery] = useState<string>('');
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   // Formulario de creación
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -414,7 +342,7 @@ export function AgencyPage() {
 
       const uniqueUsers = Array.from(
         new Map(data.integrations.map((int: PlatformIntegration) => [int.owner.id, int.owner] as [string, User]))
-        .values()
+          .values()
       );
 
       setUsers(uniqueUsers);
@@ -588,12 +516,28 @@ export function AgencyPage() {
     setSelectedUserId(userId);
     setShowCreateForm(false);
     setSelectedStoreId(''); // Reset store selection
+
+    // Update search query with selected user's name
+    const selectedUser = users.find(u => u.id === userId);
+    setUserSearchQuery(selectedUser ? `${selectedUser.name} (${selectedUser.email})` : '');
+    setShowUserDropdown(false);
+
     if (userId) {
       fetchSuggestions(userId);
     } else {
       setSuggestions([]);
     }
   };
+
+  // Filter users based on search query
+  const filteredUsers = useMemo(() => {
+    if (!userSearchQuery.trim()) return users;
+    const query = userSearchQuery.toLowerCase();
+    return users.filter(user =>
+      user.name.toLowerCase().includes(query) ||
+      user.email.toLowerCase().includes(query)
+    );
+  }, [users, userSearchQuery]);
 
   // Crear nueva sugerencia
   const handleCreateSuggestion = async () => {
@@ -1423,19 +1367,24 @@ export function AgencyPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header simple */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="px-4 sm:px-6 lg:px-8 py-4">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Panel de Agencia
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Selecciona un usuario, una store y gestiona sus sugerencias
-          </p>
+      <main className="px-4 sm:px-6 lg:px-8 py-6">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/30">
+              <Settings className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+                Panel de Agencia
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                Gestiona sugerencias y configura stores de tus clientes
+              </p>
+            </div>
+          </div>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Selector de Usuario */}
         <div className="mb-8">
           <Card>
@@ -1447,405 +1396,445 @@ export function AgencyPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="user-select">Usuario</Label>
-                <select
-                  id="user-select"
-                  value={selectedUserId}
-                  onChange={(e) => handleUserChange(e.target.value)}
+                <Label htmlFor="user-search">Usuario</Label>
+                <input
+                  id="user-search"
+                  type="text"
+                  placeholder="Buscar usuario por nombre o email..."
+                  value={userSearchQuery}
+                  onChange={(e) => {
+                    setUserSearchQuery(e.target.value);
+                    setShowUserDropdown(true);
+                  }}
+                  onFocus={() => setShowUserDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowUserDropdown(false), 200)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                >
-                  <option value="">Selecciona un usuario...</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name} ({user.email})
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
-              {/* Selector de Store agrupado por chainName */}
-              {userStores.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <Label htmlFor="store-select">Store</Label>
-                      <select
-                        id="store-select"
-                        value={selectedStoreId}
-                        onChange={(e) => {
-                          setSelectedStoreId(e.target.value);
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      >
-                        <option value="">Selecciona una store...</option>
-                        {userStores.map((group) => (
-                          <optgroup key={group.chainName} label={group.chainName}>
-                            {group.stores.map((store) => (
-                              <option key={store.id} value={store.id}>
-                                {store.name} {store.city ? `(${store.city})` : ''}
-                              </option>
-                            ))}
-                          </optgroup>
+          {/* Dropdown fuera de la Card */}
+          {showUserDropdown && filteredUsers.length > 0 && (
+            <div className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto" style={{
+              top: `${document.getElementById('user-search')?.getBoundingClientRect().bottom || 0 + window.scrollY + 8}px`,
+              left: `${document.getElementById('user-search')?.getBoundingClientRect().left || 0}px`,
+              width: `${document.getElementById('user-search')?.offsetWidth || 0}px`,
+            }}>
+              {filteredUsers.map((user) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  onClick={() => handleUserChange(user.id)}
+                  className="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                >
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 font-semibold text-sm">
+                    {user.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {user.name}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {user.email}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {showUserDropdown && userSearchQuery && filteredUsers.length === 0 && (
+            <div className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3" style={{
+              top: `${document.getElementById('user-search')?.getBoundingClientRect().bottom || 0 + window.scrollY + 8}px`,
+              left: `${document.getElementById('user-search')?.getBoundingClientRect().left || 0}px`,
+              width: `${document.getElementById('user-search')?.offsetWidth || 0}px`,
+            }}>
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                No se encontraron usuarios
+              </p>
+            </div>
+          )}
+
+          {/* Selector de Store agrupado por chainName */}
+          {userStores.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <Label htmlFor="store-select">Store</Label>
+                  <select
+                    id="store-select"
+                    value={selectedStoreId}
+                    onChange={(e) => {
+                      setSelectedStoreId(e.target.value);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  >
+                    <option value="">Selecciona una store...</option>
+                    {userStores.map((group) => (
+                      <optgroup key={group.chainName} label={group.chainName}>
+                        {group.stores.map((store) => (
+                          <option key={store.id} value={store.id}>
+                            {store.name} {store.city ? `(${store.city})` : ''}
+                          </option>
                         ))}
-                      </select>
-                    </div>
-                    {selectedStoreId && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={openStoreConfigModal}
-                        className="mt-6"
-                        title="Configurar store"
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
+                      </optgroup>
+                    ))}
+                  </select>
                 </div>
-              )}
+                {selectedStoreId && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openStoreConfigModal}
+                    className="mt-6"
+                    title="Configurar store"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
 
-              {selectedUserId && suggestions.length === 0 && !loading && (
-                <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                  Este usuario no tiene sugerencias pendientes
-                </div>
-              )}
+          {selectedUserId && suggestions.length === 0 && !loading && (
+            <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+              Este usuario no tiene sugerencias pendientes
+            </div>
+          )}
 
-              {/* Agency Navigation Buttons - Show when user and store are selected */}
-              {selectedUserId && selectedStoreId && (
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-                    Ver Métricas del Cliente
-                  </Label>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1 gap-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
-                      onClick={() => window.location.href = `/overview?agencyView=true&userId=${selectedUserId}&storeId=${selectedStoreId}`}
-                    >
-                      <BarChart3 className="h-4 w-4" />
-                      <span>Dashboard</span>
-                      <ArrowRight className="h-4 w-4 ml-auto" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1 gap-2 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 dark:hover:border-green-700 transition-colors"
-                      onClick={() => window.location.href = `/operations?agencyView=true&userId=${selectedUserId}&storeId=${selectedStoreId}`}
-                    >
-                      <Activity className="h-4 w-4" />
-                      <span>Operaciones</span>
-                      <ArrowRight className="h-4 w-4 ml-auto" />
-                    </Button>
-                  </div>
+          {/* Agency Navigation Buttons - Show when user and store are selected */}
+          {selectedUserId && selectedStoreId && (
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                Ver Métricas del Cliente
+              </Label>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+                  onClick={() => window.location.href = `/overview?agencyView=true&userId=${selectedUserId}&storeId=${selectedStoreId}`}
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  <span>Dashboard</span>
+                  <ArrowRight className="h-4 w-4 ml-auto" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-2 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 dark:hover:border-green-700 transition-colors"
+                  onClick={() => window.location.href = `/operations?agencyView=true&userId=${selectedUserId}&storeId=${selectedStoreId}`}
+                >
+                  <Activity className="h-4 w-4" />
+                  <span>Operaciones</span>
+                  <ArrowRight className="h-4 w-4 ml-auto" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+
+        {/* Grid: Pronóstico + Formulario o Lista */ }
+  {
+    selectedStoreId && (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Columna Izquierda: Clima */}
+        <div className="space-y-6">
+          <Card className="border border-gray-200 dark:border-gray-700">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Cloud className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Clima
+                  </span>
+                  {userStores.length > 0 && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {userStores
+                        .flatMap(g => g.stores)
+                        .find(s => s.id === selectedStoreId)?.city}
+                    </span>
+                  )}
                 </div>
-              )}
+                {weatherLoading ? (
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Cargando...</span>
+                ) : weatherForecast ? (
+                  <WeatherForecast forecast={weatherForecast} />
+                ) : null}
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Grid: Pronóstico + Formulario o Lista */}
-        {selectedStoreId && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Columna Izquierda: Clima */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Cloud className="h-5 w-5" />
-                    Weather Forecast
-                  </CardTitle>
-                  {userStores.length > 0 && (
-                    <CardDescription>
-                      {userStores
-                        .flatMap(g => g.stores)
-                        .find(s => s.id === selectedStoreId)?.name}
-                      {userStores
-                        .flatMap(g => g.stores)
-                        .find(s => s.id === selectedStoreId)?.city && ` - ${userStores
-                        .flatMap(g => g.stores)
-                        .find(s => s.id === selectedStoreId)?.city}`}
-                    </CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  {weatherLoading ? (
-                    <div className="text-center py-8 text-muted-foreground">Loading forecast...</div>
-                  ) : weatherForecast ? (
-                    <WeatherForecast forecast={weatherForecast} />
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No weather data available for this store
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+        {/* Columna Derecha: Sugerencias o Formulario */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Sugerencias
+            </h2>
+            <Button
+              onClick={() => setShowCreateForm(!showCreateForm)}
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              {showCreateForm ? 'Cancelar' : 'Nueva Sugerencia'}
+            </Button>
+          </div>
 
-            {/* Columna Derecha: Sugerencias o Formulario */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Sugerencias
-                </h2>
-                <Button onClick={() => setShowCreateForm(!showCreateForm)}>
-                  {showCreateForm ? 'Cancelar' : '+ Nueva Sugerencia'}
+          {/* Formulario de creación */}
+          {showCreateForm ? (
+            <Card className="border-2 border-blue-500 dark:border-blue-600">
+              <CardHeader>
+                <CardTitle>Crear Nueva Sugerencia</CardTitle>
+                <CardDescription>
+                  Select the type of suggestion and fill in the required information
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Selector de tipo */}
+                <div>
+                  <Label>Suggestion Type</Label>
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    {filteredSuggestionTypes.map((type) => {
+                      const Icon = type.icon;
+                      return (
+                        <button
+                          key={type.value}
+                          type="button"
+                          onClick={() => setSelectedType(type.value as SuggestionType)}
+                          className={`p-3 rounded-lg border text-left transition-colors ${selectedType === type.value
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                            }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <Icon className="h-4 w-4" />
+                            <span className="font-medium text-sm">{type.label}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{type.description}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Formulario específico */}
+                {renderSpecificForm()}
+
+                <Button onClick={handleCreateSuggestion} className="w-full">
+                  Create Suggestion
                 </Button>
-              </div>
-
-              {/* Formulario de creación */}
-              {showCreateForm ? (
-                <Card className="border-2 border-blue-500 dark:border-blue-600">
-                  <CardHeader>
-                    <CardTitle>Crear Nueva Sugerencia</CardTitle>
-                    <CardDescription>
-                      Select the type of suggestion and fill in the required information
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Selector de tipo */}
-                    <div>
-                      <Label>Suggestion Type</Label>
-                      <div className="grid grid-cols-2 gap-3 mt-2">
-                        {filteredSuggestionTypes.map((type) => {
-                          const Icon = type.icon;
-                          return (
-                            <button
-                              key={type.value}
-                              type="button"
-                              onClick={() => setSelectedType(type.value as SuggestionType)}
-                              className={`p-3 rounded-lg border text-left transition-colors ${
-                                selectedType === type.value
-                                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
-                                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 mb-1">
-                                <Icon className="h-4 w-4" />
-                                <span className="font-medium text-sm">{type.label}</span>
-                              </div>
-                              <p className="text-xs text-muted-foreground">{type.description}</p>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Formulario específico */}
-                    {renderSpecificForm()}
-
-                    <Button onClick={handleCreateSuggestion} className="w-full">
-                      Create Suggestion
-                    </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            /* Lista de sugerencias */
+            <>
+              {loading ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  Cargando sugerencias...
+                </div>
+              ) : suggestions.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <p className="text-gray-500 dark:text-gray-400">
+                      No hay sugerencias para este usuario
+                    </p>
                   </CardContent>
                 </Card>
               ) : (
-                /* Lista de sugerencias */
-                <>
-                  {loading ? (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      Cargando sugerencias...
-                    </div>
-                  ) : suggestions.length === 0 ? (
-                    <Card>
-                      <CardContent className="text-center py-8">
-                        <p className="text-gray-500 dark:text-gray-400">
-                          No hay sugerencias para este usuario
-                        </p>
+                <div className="space-y-4">
+                  {suggestions.map((suggestion) => (
+                    <Card key={suggestion.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="pt-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {getStatusBadge(suggestion.status)}
+                              <Badge variant="outline">{suggestion.type}</Badge>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {new Date(suggestion.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <h3 className="font-semibold text-gray-900 dark:text-white">
+                              {suggestion.title}
+                            </h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {suggestion.description}
+                            </p>
+                            {suggestion.appliedAt && (
+                              <p className="text-xs text-gray-500 dark:text-gray-500">
+                                Aplicada: {new Date(suggestion.appliedAt).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </CardContent>
                     </Card>
-                  ) : (
-                    <div className="space-y-4">
-                      {suggestions.map((suggestion) => (
-                        <Card key={suggestion.id} className="hover:shadow-md transition-shadow">
-                          <CardContent className="pt-6">
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1 space-y-2">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  {getStatusBadge(suggestion.status)}
-                                  <Badge variant="outline">{suggestion.type}</Badge>
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {new Date(suggestion.createdAt).toLocaleDateString()}
-                                  </span>
-                                </div>
-                                <h3 className="font-semibold text-gray-900 dark:text-white">
-                                  {suggestion.title}
-                                </h3>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                  {suggestion.description}
-                                </p>
-                                {suggestion.appliedAt && (
-                                  <p className="text-xs text-gray-500 dark:text-gray-500">
-                                    Aplicada: {new Date(suggestion.appliedAt).toLocaleString()}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </>
+                  ))}
+                </div>
               )}
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  {/* Store Config Modal */ }
+  <Dialog open={isStoreConfigModalOpen} onOpenChange={setIsStoreConfigModalOpen}>
+    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Store className="h-5 w-5" />
+          Configurar: {userStores.flatMap(g => g.stores).find(s => s.id === selectedStoreId)?.name}
+        </DialogTitle>
+        <DialogDescription>
+          {storeConfigData?.source === 'store'
+            ? 'Edita la configuración personalizada de este local'
+            : 'Configura valores personalizados para este local. Los campos vacíos usarán los valores predeterminados.'}
+        </DialogDescription>
+      </DialogHeader>
+
+      {isLoadingStoreConfig ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-blue-800 dark:text-blue-200">
+              {storeConfigData?.source === 'store'
+                ? 'Este local usa configuración personalizada. Todos los valores definidos aquí reemplazan los valores predeterminados.'
+                : 'Deja los campos vacíos para usar los valores predeterminados. Solo completa los campos que quieras personalizar.'}
             </div>
           </div>
+
+          {storeConfigData?.source === 'store' && (
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300">
+                Personalizado
+              </Badge>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Este local tiene configuración personalizada
+              </span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="agencyStorePlatformCommission">Comisión de Plataforma (%)</Label>
+              <Input
+                id="agencyStorePlatformCommission"
+                type="number"
+                value={storeConfigForm.platformCommission || ''}
+                onChange={(e) => setStoreConfigForm({ ...storeConfigForm, platformCommission: Number(e.target.value) || null })}
+                placeholder="Predeterminado"
+                min="0"
+                max="100"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="agencyStoreMarkup">Markup (%)</Label>
+              <Input
+                id="agencyStoreMarkup"
+                type="number"
+                value={storeConfigForm.markupPercentage || ''}
+                onChange={(e) => setStoreConfigForm({ ...storeConfigForm, markupPercentage: Number(e.target.value) || null })}
+                placeholder="Predeterminado"
+                min="0"
+                max="100"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="agencyStoreCostOfGoods">CMV - Costo de Mercadería (%)</Label>
+              <Input
+                id="agencyStoreCostOfGoods"
+                type="number"
+                value={storeConfigForm.costOfGoods || ''}
+                onChange={(e) => setStoreConfigForm({ ...storeConfigForm, costOfGoods: Number(e.target.value) || null })}
+                placeholder="Predeterminado"
+                min="0"
+                max="100"
+              />
+              <p className="text-xs text-gray-500">Costo de insumos como % del precio</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="agencyStoreFixedCosts">Costos Fijos Mensuales ($)</Label>
+              <Input
+                id="agencyStoreFixedCosts"
+                type="number"
+                value={storeConfigForm.fixedMonthlyCosts || ''}
+                onChange={(e) => setStoreConfigForm({ ...storeConfigForm, fixedMonthlyCosts: Number(e.target.value) || null })}
+                placeholder="Predeterminado"
+                min="0"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="agencyStorePackagingCost">Costo de Packaging ($)</Label>
+              <Input
+                id="agencyStorePackagingCost"
+                type="number"
+                value={storeConfigForm.packagingCost || ''}
+                onChange={(e) => setStoreConfigForm({ ...storeConfigForm, packagingCost: Number(e.target.value) || null })}
+                placeholder="Predeterminado"
+                min="0"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="agencyStoreDeliveryCost">Costo de Delivery ($)</Label>
+              <Input
+                id="agencyStoreDeliveryCost"
+                type="number"
+                value={storeConfigForm.deliveryCost || ''}
+                onChange={(e) => setStoreConfigForm({ ...storeConfigForm, deliveryCost: Number(e.target.value) || null })}
+                placeholder="Predeterminado"
+                min="0"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <DialogFooter className="gap-2">
+        {storeConfigData?.source === 'store' && (
+          <Button
+            variant="outline"
+            onClick={resetStoreToDefaults}
+            disabled={isSavingStoreConfig}
+            className="text-red-600 hover:text-red-700"
+          >
+            Restablecer a Predeterminados
+          </Button>
         )}
-
-        {/* Store Config Modal */}
-        <Dialog open={isStoreConfigModalOpen} onOpenChange={setIsStoreConfigModalOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Store className="h-5 w-5" />
-                Configurar: {userStores.flatMap(g => g.stores).find(s => s.id === selectedStoreId)?.name}
-              </DialogTitle>
-              <DialogDescription>
-                {storeConfigData?.source === 'store'
-                  ? 'Edita la configuración personalizada de este local'
-                  : 'Configura valores personalizados para este local. Los campos vacíos usarán los valores predeterminados.'}
-              </DialogDescription>
-            </DialogHeader>
-
-            {isLoadingStoreConfig ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-blue-800 dark:text-blue-200">
-                    {storeConfigData?.source === 'store'
-                      ? 'Este local usa configuración personalizada. Todos los valores definidos aquí reemplazan los valores predeterminados.'
-                      : 'Deja los campos vacíos para usar los valores predeterminados. Solo completa los campos que quieras personalizar.'}
-                  </div>
-                </div>
-
-                {storeConfigData?.source === 'store' && (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300">
-                      Personalizado
-                    </Badge>
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      Este local tiene configuración personalizada
-                    </span>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="agencyStorePlatformCommission">Comisión de Plataforma (%)</Label>
-                    <Input
-                      id="agencyStorePlatformCommission"
-                      type="number"
-                      value={storeConfigForm.platformCommission || ''}
-                      onChange={(e) => setStoreConfigForm({ ...storeConfigForm, platformCommission: Number(e.target.value) || null })}
-                      placeholder="Predeterminado"
-                      min="0"
-                      max="100"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="agencyStoreMarkup">Markup (%)</Label>
-                    <Input
-                      id="agencyStoreMarkup"
-                      type="number"
-                      value={storeConfigForm.markupPercentage || ''}
-                      onChange={(e) => setStoreConfigForm({ ...storeConfigForm, markupPercentage: Number(e.target.value) || null })}
-                      placeholder="Predeterminado"
-                      min="0"
-                      max="100"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="agencyStoreCostOfGoods">CMV - Costo de Mercadería (%)</Label>
-                    <Input
-                      id="agencyStoreCostOfGoods"
-                      type="number"
-                      value={storeConfigForm.costOfGoods || ''}
-                      onChange={(e) => setStoreConfigForm({ ...storeConfigForm, costOfGoods: Number(e.target.value) || null })}
-                      placeholder="Predeterminado"
-                      min="0"
-                      max="100"
-                    />
-                    <p className="text-xs text-gray-500">Costo de insumos como % del precio</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="agencyStoreFixedCosts">Costos Fijos Mensuales ($)</Label>
-                    <Input
-                      id="agencyStoreFixedCosts"
-                      type="number"
-                      value={storeConfigForm.fixedMonthlyCosts || ''}
-                      onChange={(e) => setStoreConfigForm({ ...storeConfigForm, fixedMonthlyCosts: Number(e.target.value) || null })}
-                      placeholder="Predeterminado"
-                      min="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="agencyStorePackagingCost">Costo de Packaging ($)</Label>
-                    <Input
-                      id="agencyStorePackagingCost"
-                      type="number"
-                      value={storeConfigForm.packagingCost || ''}
-                      onChange={(e) => setStoreConfigForm({ ...storeConfigForm, packagingCost: Number(e.target.value) || null })}
-                      placeholder="Predeterminado"
-                      min="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="agencyStoreDeliveryCost">Costo de Delivery ($)</Label>
-                    <Input
-                      id="agencyStoreDeliveryCost"
-                      type="number"
-                      value={storeConfigForm.deliveryCost || ''}
-                      onChange={(e) => setStoreConfigForm({ ...storeConfigForm, deliveryCost: Number(e.target.value) || null })}
-                      placeholder="Predeterminado"
-                      min="0"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <DialogFooter className="gap-2">
-              {storeConfigData?.source === 'store' && (
-                <Button
-                  variant="outline"
-                  onClick={resetStoreToDefaults}
-                  disabled={isSavingStoreConfig}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  Restablecer a Predeterminados
-                </Button>
-              )}
-              <Button variant="outline" onClick={() => setIsStoreConfigModalOpen(false)} disabled={isSavingStoreConfig}>
-                Cancelar
-              </Button>
-              <Button
-                onClick={saveStoreConfig}
-                disabled={isSavingStoreConfig}
-                className="bg-indigo-600 hover:bg-indigo-700"
-              >
-                {isSavingStoreConfig ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Guardar
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </main>
-    </div>
+        <Button variant="outline" onClick={() => setIsStoreConfigModalOpen(false)} disabled={isSavingStoreConfig}>
+          Cancelar
+        </Button>
+        <Button
+          onClick={saveStoreConfig}
+          disabled={isSavingStoreConfig}
+          className="bg-indigo-600 hover:bg-indigo-700"
+        >
+          {isSavingStoreConfig ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Guardando...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              Guardar
+            </>
+          )}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+      </main >
+    </div >
   );
 }
