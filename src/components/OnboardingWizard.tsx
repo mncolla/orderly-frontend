@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { ChevronRight, ChevronLeft, Check, Store, Loader2, UtensilsCrossed, ShoppingCart, Home } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check, Store, Loader2, TrendingUp, UtensilsCrossed, ShoppingCart, Home, Settings, Target, BarChart3 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { platformIntegrationsService, type SyncProgress } from '../services/platformIntegrationsService';
 import { useConnectPedidosYa } from '../hooks/useIntegrations';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card } from '@/components/ui/card';
 import type { OrganizationObjective } from '../types/organization';
 import { objectiveTypeLabels, objectiveUnitLabels, ObjectiveType, ObjectiveUnit } from '../types/organization';
 
@@ -33,7 +33,7 @@ interface StoreWithConfig {
 
 export function OnboardingWizard() {
   const [, navigate] = useLocation();
-  const { user, refetchUser } = useAuth();
+  const { refetchUser } = useAuth();
   const [currentStep, setCurrentStep] = useState<Step>('platform');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -52,7 +52,7 @@ export function OnboardingWizard() {
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [syncError, setSyncError] = useState('');
 
-  // Mutation for platform connection (used for both connect and verify-otp)
+  // Mutation for platform connection
   const connectMutation = useConnectPedidosYa();
 
   // Polling effect for sync progress
@@ -71,12 +71,10 @@ export function OnboardingWizard() {
         if (result.progress) {
           setSyncProgress(result.progress);
 
-          // Check if all steps are completed
           const allCompleted = result.progress.steps.every(step => step.status === 'completed');
           if (allCompleted) {
             setIsSyncing(false);
             setSyncStarted(false);
-            // Auto-navigate to defaultConfig step after a short delay
             setTimeout(() => {
               setCurrentStep('defaultConfig');
             }, 1000);
@@ -85,7 +83,7 @@ export function OnboardingWizard() {
       } catch (error: any) {
         console.error('Error polling sync progress:', error);
       }
-    }, 2000); // Poll every 2 seconds
+    }, 2000);
 
     return () => clearInterval(pollInterval);
   }, [syncStarted, isSyncing, selectedPlatform]);
@@ -93,7 +91,6 @@ export function OnboardingWizard() {
   // Auto-start sync when connection is successful
   useEffect(() => {
     if (createdIntegration && !syncStarted) {
-      // Start sync automatically after connection
       handleStartSync();
     }
   }, [createdIntegration]);
@@ -127,44 +124,62 @@ export function OnboardingWizard() {
     }
   }, [createdIntegration]);
 
-  // Step 2: Objectives
-  const [objectives, setObjectives] = useState<OrganizationObjective[]>([
-    {
-      type: 'INCREASE_SALES_VOLUME' as ObjectiveType,
-      target: 20,
-      unit: 'PERCENTAGE' as ObjectiveUnit,
-    },
-  ]);
+  // Objectives (Step 4)
+  const [objectives, setObjectives] = useState<Array<OrganizationObjective & { id: string }>>([]);
 
-  const addObjective = () => {
-    setObjectives([
-      ...objectives,
-      {
-        type: 'INCREASE_SALES_VOLUME' as ObjectiveType,
-        target: 10,
-        unit: 'PERCENTAGE' as ObjectiveUnit,
-      },
-    ]);
+  const handleConnectPlatform = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConnectionError('');
+    setIsLoading(true);
+
+    try {
+      const result = await connectMutation.mutateAsync({
+        email: connectionEmail,
+        password: connectionPassword,
+      });
+
+      if (result.needsOTP) {
+        setNeedsOTP(true);
+      } else if (result.integration) {
+        setCreatedIntegration(result.integration);
+      }
+    } catch (error: any) {
+      setConnectionError(error.message || 'Error al conectar con la plataforma');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const removeObjective = (index: number) => {
-    setObjectives(objectives.filter((_, i) => i !== index));
-  };
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConnectionError('');
+    setIsLoading(true);
 
-  const updateObjective = (index: number, field: keyof OrganizationObjective, value: any) => {
-    const newObjectives = [...objectives];
-    newObjectives[index] = { ...newObjectives[index], [field]: value };
-    setObjectives(newObjectives);
+    try {
+      const result = await connectMutation.mutateAsync({
+        email: connectionEmail,
+        password: connectionPassword,
+        otpCode,
+      });
+
+      if (result.integration) {
+        setCreatedIntegration(result.integration);
+        setNeedsOTP(false);
+      }
+    } catch (error: any) {
+      setConnectionError(error.message || 'Error al verificar el código');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleStartSync = async () => {
-    setSyncError('');
-    setIsSyncing(true);
-    setSyncStarted(true);
-
     try {
-      const result = await platformIntegrationsService.startSegmentedSync(selectedPlatform);
-      setSyncProgress(result.progress);
+      setIsSyncing(true);
+      setSyncStarted(true);
+      setSyncError('');
+
+      await platformIntegrationsService.startSegmentedSync(selectedPlatform);
     } catch (error: any) {
       setSyncError(error.message || 'Error al iniciar la sincronización');
       setIsSyncing(false);
@@ -172,947 +187,654 @@ export function OnboardingWizard() {
     }
   };
 
-  // Platform connection handlers
-  const handleConnectPlatform = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setConnectionError('');
-
-    if (!connectionEmail || !connectionPassword) {
-      setConnectionError('Por favor completa todos los campos');
-      return;
-    }
-
-    try {
-      const response = await connectMutation.mutateAsync({
-        email: connectionEmail,
-        password: connectionPassword,
-      });
-
-      if (response.needsOTP) {
-        setNeedsOTP(true);
-      } else {
-        // Connection successful without OTP
-        setCreatedIntegration(response.integration);
-        // Recargar usuario para obtener la integración
-        await refetchUser();
-        // NO avanzar automáticamente - mostrar pantalla de sincronización
-      }
-    } catch (error: any) {
-      setConnectionError(error.message || 'Error al conectar. Verifica tus credenciales.');
-      console.error('Connection error:', error);
-    }
+  const addObjective = () => {
+    setObjectives([...objectives, {
+      id: crypto.randomUUID(),
+      type: ObjectiveType.INCREASE_SALES_VOLUME,
+      unit: ObjectiveUnit.PERCENTAGE,
+      target: 10,
+    }]);
   };
 
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setConnectionError('');
-
-    if (!otpCode || otpCode.length !== 6) {
-      setConnectionError('Por favor ingresa el código de 6 dígitos');
-      return;
-    }
-
-    try {
-      const response = await connectMutation.mutateAsync({
-        email: connectionEmail,
-        password: connectionPassword,
-        otpCode: otpCode, // Send OTP code to the same /connect endpoint
-      });
-
-      setCreatedIntegration(response.integration);
-      setNeedsOTP(false);
-      // Recargar usuario para obtener la integración
-      await refetchUser();
-      // NO avanzar automáticamente - mostrar pantalla de sincronización
-    } catch (error: any) {
-      setConnectionError(error.message || 'Código incorrecto. Intenta nuevamente.');
-      console.error('OTP verification error:', error);
-    }
+  const updateObjective = (id: string, updates: Partial<OrganizationObjective>) => {
+    setObjectives(objectives.map(obj => obj.id === id ? { ...obj, ...updates } : obj));
   };
 
-  const toggleStoreCustomConfig = (storeId: string) => {
-    setStoresWithConfig(storesWithConfig.map(store => {
-      if (store.id === storeId) {
-        return {
-          ...store,
-          useCustomConfig: !store.useCustomConfig,
-          config: !store.useCustomConfig ? { ...defaultConfig } : {},
-        };
-      }
-      return store;
-    }));
+  const removeObjective = (id: string) => {
+    setObjectives(objectives.filter(obj => obj.id !== id));
   };
 
-  const updateStoreConfig = (storeId: string, field: string, value: number | null) => {
-    setStoresWithConfig(storesWithConfig.map(store => {
-      if (store.id === storeId) {
-        return {
-          ...store,
-          config: {
-            ...store.config,
-            [field]: value !== null ? value : undefined,
-          },
-        };
-      }
-      return store;
-    }));
-  };
-
-  const handleSubmit = async () => {
-    // Obtener la integración ya sea de la que acabamos de crear o de las integraciones del usuario
-    let integrationId = createdIntegration?.id;
-
-    if (!integrationId && user?.integrations && user.integrations.length > 0) {
-      integrationId = user.integrations[0].id;
-    }
-
-    if (!integrationId) {
-      console.error('No platform integration found');
-      alert('Error: No se encontró ninguna integración de plataforma. Por favor conecta una plataforma primero.');
-      return;
-    }
-
+  const handleCompleteOnboarding = async () => {
     setIsLoading(true);
     try {
-      // Build store configs array for stores with custom config
-      const storeConfigs = storesWithConfig
-        .filter(store => store.useCustomConfig)
-        .map(store => ({
-          storeId: store.id,
-          ...store.config,
-        }));
-
-      // Map defaultConfig to costs format for backward compatibility
-      const costsForBackend = {
-        platformCommission: defaultConfig.platformCommission,
-        markup: defaultConfig.markupPercentage,
-        fixedCosts: defaultConfig.fixedMonthlyCosts,
-        variableCosts: defaultConfig.packagingCost + defaultConfig.deliveryCost,
-        costOfGoods: defaultConfig.costOfGoods,
-      };
-
-      // Complete onboarding
-      await platformIntegrationsService.completeOnboarding(integrationId, {
-        costs: costsForBackend,
-        objectives,
-        storeConfigs: storeConfigs.length > 0 ? storeConfigs : undefined,
+      // Save default config
+      await fetch('/api/business-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` },
+        body: JSON.stringify(defaultConfig),
       });
 
-      // Recargar usuario explícitamente
+      // Save store configs
+      for (const store of storesWithConfig) {
+        if (store.useCustomConfig && store.config) {
+          await fetch(`/api/stores/${store.id}/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` },
+            body: JSON.stringify(store.config),
+          });
+        }
+      }
+
+      // Save objectives
+      for (const objective of objectives) {
+        await fetch('/api/objectives', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` },
+          body: JSON.stringify(objective),
+        });
+      }
+
       await refetchUser();
-
-      // Wait a moment para asegurar que el usuario se actualizó
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      // Navigate to overview
       navigate('/overview');
     } catch (error: any) {
       console.error('Error completing onboarding:', error);
-      alert(error.message || 'Error al completar el onboarding. Por favor intenta nuevamente.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const renderStep = () => {
-    switch (currentStep) {
-      case 'platform':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold">Conecta tu Plataforma de Delivery</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Conecta una plataforma para crear tu organización y acceder a tus locales
+  const steps = [
+    { id: 'platform', title: 'Plataforma', icon: Store },
+    { id: 'defaultConfig', title: 'Configuración', icon: Settings },
+    { id: 'storeConfig', title: 'Locales', icon: Home },
+    { id: 'objectives', title: 'Objetivos', icon: Target },
+    { id: 'summary', title: 'Resumen', icon: Check },
+  ];
+
+  const currentStepIndex = steps.findIndex(s => s.id === currentStep);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      {/* Header - Mobile */}
+      <div className="lg:hidden bg-gradient-to-r from-blue-600 to-blue-700 p-4">
+        <div className="flex items-center gap-3">
+          <div className="bg-white/20 backdrop-blur-sm p-2 rounded-lg">
+            <TrendingUp className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-white">Configura tu cuenta</h1>
+            <p className="text-blue-100 text-xs">Paso {currentStepIndex + 1} de {steps.length}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Progress Steps */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            {steps.map((step, index) => {
+              const StepIcon = step.icon;
+              const isCompleted = index < currentStepIndex;
+              const isCurrent = index === currentStepIndex;
+
+              return (
+                <div key={step.id} className="flex items-center flex-1">
+                  <div className="flex flex-col items-center flex-1">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                        isCompleted
+                          ? 'bg-blue-600 text-white'
+                          : isCurrent
+                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 ring-2 ring-blue-600'
+                          : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                      }`}
+                    >
+                      {isCompleted ? (
+                        <Check className="h-5 w-5" />
+                      ) : (
+                        <StepIcon className="h-5 w-5" />
+                      )}
+                    </div>
+                    <span
+                      className={`text-xs mt-1 hidden sm:block ${
+                        isCurrent ? 'font-semibold text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
+                      }`}
+                    >
+                      {step.title}
+                    </span>
+                  </div>
+                  {index < steps.length - 1 && (
+                    <div
+                      className={`flex-1 h-0.5 mx-2 ${
+                        index < currentStepIndex ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
+        {/* Step 1: Platform Connection */}
+        {currentStep === 'platform' && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8">
+            <div className="text-center mb-6">
+              <div className="inline-flex p-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 mb-4">
+                <Store className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                Conecta tu plataforma de delivery
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
+                Comienza conectando tu cuenta de PedidosYa para sincronizar tus datos
               </p>
             </div>
 
-            {createdIntegration ? (
-              // Show success state after connection
-              <div className="space-y-4">
-                {!syncStarted ? (
-                  <>
-                    <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10">
-                      <CardContent className="pt-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                            <Check className="h-6 w-6 text-green-600 dark:text-green-400" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-green-900 dark:text-green-100">¡Conectado exitosamente!</p>
-                            <p className="text-sm text-green-700 dark:text-green-300">
-                              Plataforma conectada: {createdIntegration.platform}
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {createdIntegration.stores && createdIntegration.stores.length > 0 && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <Store className="h-4 w-4" />
-                        <span>Se detectaron {createdIntegration.stores.length} locales</span>
-                      </div>
-                    )}
-
-                    <div className="text-center py-4">
-                      <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mx-auto mb-3" />
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Iniciando sincronización automática...
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  // Sync progress UI
-                  <div className="space-y-4">
-                    <div className="text-center">
-                      <h4 className="font-semibold text-lg">Sincronizando datos...</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Esto puede tomar unos minutos
-                      </p>
-                    </div>
-
-                    {/* Sync Steps */}
-                    <div className="space-y-3">
-                      {syncProgress?.steps.map((step) => {
-                        const StepIcon = step.step === 'stores' ? Home :
-                                        step.step === 'menu' ? UtensilsCrossed :
-                                        ShoppingCart;
-
-                        return (
-                          <Card key={step.step} className={`border-2 transition-all ${
-                            step.status === 'completed' ? 'border-green-500 dark:border-green-600' :
-                            step.status === 'in_progress' ? 'border-indigo-500 dark:border-indigo-600' :
-                            step.status === 'failed' ? 'border-red-500 dark:border-red-600' :
-                            'border-gray-200 dark:border-gray-700'
-                          }`}>
-                            <CardContent className="pt-4">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                  step.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30' :
-                                  step.status === 'in_progress' ? 'bg-indigo-100 dark:bg-indigo-900/30' :
-                                  step.status === 'failed' ? 'bg-red-100 dark:bg-red-900/30' :
-                                  'bg-gray-100 dark:bg-gray-800'
-                                }`}>
-                                  {step.status === 'completed' ? (
-                                    <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                  ) : step.status === 'in_progress' ? (
-                                    <Loader2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400 animate-spin" />
-                                  ) : step.status === 'failed' ? (
-                                    <span className="text-red-600 dark:text-red-400">✕</span>
-                                  ) : (
-                                    <StepIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                                  )}
-                                </div>
-
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="font-medium">
-                                      {step.step === 'stores' ? 'Locales' :
-                                       step.step === 'menu' ? 'Menú (Categorías + Productos)' :
-                                       'Órdenes'}
-                                    </span>
-                                    <span className="text-xs text-gray-600 dark:text-gray-400">
-                                      {step.progress}/{step.total}
-                                    </span>
-                                  </div>
-
-                                  {/* Progress bar */}
-                                  {step.status === 'in_progress' || step.status === 'completed' ? (
-                                    <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                      <div
-                                        className={`h-full transition-all ${
-                                          step.status === 'completed' ? 'bg-green-500' : 'bg-indigo-500'
-                                        }`}
-                                        style={{ width: `${(step.progress / step.total) * 100}%` }}
-                                      />
-                                    </div>
-                                  ) : null}
-
-                                  {/* Message */}
-                                  {step.message && (
-                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                      {step.message}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-
-                    {/* Sync error */}
-                    {syncError && (
-                      <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                        <p className="text-sm text-red-800 dark:text-red-200">{syncError}</p>
-                      </div>
-                    )}
-
-                    {/* All completed message */}
-                    {syncProgress?.steps.every(s => s.status === 'completed') && (
-                      <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                        <Check className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
-                        <p className="font-semibold text-green-900 dark:text-green-100">¡Sincronización completada!</p>
-                        <p className="text-sm text-green-700 dark:text-green-300">
-                          Redirigiendo al siguiente paso...
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
+            <div className="space-y-6">
+              {/* Platform selector */}
+              <div>
+                <Label className="text-sm sm:text-base font-medium mb-3 block">Selecciona la plataforma</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {(['PEDIDOS_YA', 'RAPPI', 'GLOVO', 'UBER_EATS'] as DeliveryPlatform[]).map((platform) => (
+                    <button
+                      key={platform}
+                      onClick={() => setSelectedPlatform(platform)}
+                      disabled={platform !== 'PEDIDOS_YA'}
+                      className={`p-4 rounded-xl border-2 transition-all text-center ${
+                        selectedPlatform === platform
+                          ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
+                          : 'border-gray-300 dark:border-gray-600 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <span className="text-xs sm:text-sm font-medium block">
+                        {platform === 'PEDIDOS_YA' ? 'PedidosYa' :
+                         platform === 'RAPPI' ? 'Rappi' :
+                         platform === 'GLOVO' ? 'Glovo' : 'Uber Eats'}
+                      </span>
+                      {platform !== 'PEDIDOS_YA' && (
+                        <span className="text-xs text-gray-500 block mt-1">Próximamente</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ) : needsOTP ? (
-              // OTP verification form
-              <form onSubmit={handleVerifyOTP} className="space-y-4">
-                <div>
-                  <Label htmlFor="otp">Código de Verificación</Label>
-                  <p className="text-xs text-gray-500 mb-2">
-                    Enviamos un código de 6 dígitos a tu correo
-                  </p>
-                  <Input
-                    id="otp"
-                    type="text"
-                    placeholder="000000"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    maxLength={6}
-                    className="text-center text-2xl tracking-widest"
-                    autoFocus
-                  />
-                </div>
 
-                {connectionError && (
-                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                    <p className="text-sm text-red-800 dark:text-red-200">{connectionError}</p>
-                  </div>
-                )}
-
-                <Button
-                  type="submit"
-                  disabled={connectMutation.isPending || otpCode.length !== 6}
-                  className="w-full"
-                >
-                  {connectMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Verificando...
-                    </>
-                  ) : (
-                    'Verificar Código'
-                  )}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setNeedsOTP(false)}
-                  className="w-full"
-                >
-                  Volver
-                </Button>
-              </form>
-            ) : (
-              // Platform selection and connection form
-              <div className="space-y-6">
-                {/* Platform selector */}
-                <div>
-                  <Label>Selecciona una plataforma</Label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
-                    {[
-                      { value: 'PEDIDOS_YA' as DeliveryPlatform, name: 'PedidosYa', icon: '🟡', color: 'yellow' },
-                      { value: 'RAPPI' as DeliveryPlatform, name: 'Rappi', icon: '🟢', color: 'green' },
-                      { value: 'GLOVO' as DeliveryPlatform, name: 'Glovo', icon: '🟠', color: 'orange' },
-                      { value: 'UBER_EATS' as DeliveryPlatform, name: 'Uber Eats', icon: '🟢', color: 'green' },
-                    ].map((platform) => (
-                      <button
-                        key={platform.value}
-                        type="button"
-                        onClick={() => setSelectedPlatform(platform.value)}
-                        className={`p-3 rounded-lg border-2 transition-all ${
-                          selectedPlatform === platform.value
-                            ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20'
-                            : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                        }`}
-                      >
-                        <span className="text-xl block">{platform.icon}</span>
-                        <span className="block mt-1 text-xs font-medium">{platform.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Connection form */}
+              {/* Connection form */}
+              {!needsOTP ? (
                 <form onSubmit={handleConnectPlatform} className="space-y-4">
+                  {connectionError && (
+                    <div className="p-3 sm:p-4 text-sm text-red-800 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-800">
+                      {connectionError}
+                    </div>
+                  )}
+
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email de {selectedPlatform === 'PEDIDOS_YA' ? 'PedidosYa' : selectedPlatform}</Label>
+                    <Label htmlFor="email" className="text-sm sm:text-base">Email de PedidosYa</Label>
                     <Input
                       id="email"
                       type="email"
+                      required
                       placeholder="tu@email.com"
                       value={connectionEmail}
                       onChange={(e) => setConnectionEmail(e.target.value)}
-                      required
+                      className="h-10 sm:h-11"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="password">Contraseña</Label>
+                    <Label htmlFor="password" className="text-sm sm:text-base">Contraseña de PedidosYa</Label>
                     <Input
                       id="password"
                       type="password"
+                      required
                       placeholder="••••••••"
                       value={connectionPassword}
                       onChange={(e) => setConnectionPassword(e.target.value)}
-                      required
+                      className="h-10 sm:h-11"
                     />
                   </div>
 
-                  {connectionError && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                      <p className="text-sm text-red-800 dark:text-red-200">{connectionError}</p>
-                    </div>
-                  )}
-
                   <Button
                     type="submit"
-                    disabled={connectMutation.isPending || !connectionEmail || !connectionPassword}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700"
+                    disabled={isLoading || connectMutation.isPending}
+                    className="w-full h-10 sm:h-11 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30"
                   >
-                    {connectMutation.isPending ? (
+                    {isLoading || connectMutation.isPending ? (
                       <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Conectando...
                       </>
                     ) : (
-                      <>
-                        <Store className="h-4 w-4 mr-2" />
-                        Conectar Plataforma
-                      </>
+                      'Conectar cuenta'
                     )}
                   </Button>
                 </form>
+              ) : (
+                <form onSubmit={handleVerifyOTP} className="space-y-4">
+                  <div className="text-center mb-4">
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
+                      Enviamos un código de 6 dígitos a tu correo
+                    </p>
+                  </div>
 
-                <p className="text-xs text-gray-500 text-center">
-                  Tus credenciales se almacenan de forma segura y solo se usan para sincronizar tus datos
-                </p>
-              </div>
-            )}
+                  {connectionError && (
+                    <div className="p-3 sm:p-4 text-sm text-red-800 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-800">
+                      {connectionError}
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="otp" className="text-sm sm:text-base">Código de verificación</Label>
+                    <Input
+                      id="otp"
+                      type="text"
+                      placeholder="000000"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      maxLength={6}
+                      className="h-10 sm:h-11 text-center text-2xl tracking-widest"
+                      autoFocus
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={connectMutation.isPending || otpCode.length !== 6}
+                    className="w-full h-10 sm:h-11 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30"
+                  >
+                    {connectMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Verificando...
+                      </>
+                    ) : (
+                      'Verificar'
+                    )}
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNeedsOTP(false)}
+                    className="w-full text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  >
+                    Volver
+                  </button>
+                </form>
+              )}
+
+              {/* Sync progress */}
+              {isSyncing && syncProgress && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Sincronizando tus datos...</span>
+                  </div>
+
+                  {syncProgress.steps.map((step, idx) => {
+                    const StepIcon = step.step === 'stores' ? Store :
+                                    step.step === 'menu' ? UtensilsCrossed : ShoppingCart;
+
+                    return (
+                      <Card key={idx} className="p-3 sm:p-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${
+                            step.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30' :
+                            step.status === 'in_progress' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                            'bg-gray-100 dark:bg-gray-700'
+                          }`}>
+                            {step.status === 'completed' ? (
+                              <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            ) : step.status === 'in_progress' ? (
+                              <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin" />
+                            ) : (
+                              <StepIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                            )}
+                          </div>
+
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium">
+                                {step.step === 'stores' ? 'Locales' :
+                                 step.step === 'menu' ? 'Menú' : 'Órdenes'}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {step.progress}/{step.total}
+                              </span>
+                            </div>
+
+                            {(step.status === 'in_progress' || step.status === 'completed') && (
+                              <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full transition-all ${
+                                    step.status === 'completed' ? 'bg-green-500' : 'bg-blue-500'
+                                  }`}
+                                  style={{ width: `${(step.progress / step.total) * 100}%` }}
+                                />
+                              </div>
+                            )}
+
+                            {step.message && (
+                              <p className="text-xs text-gray-500 mt-1">{step.message}</p>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              {syncError && (
+                <div className="p-3 sm:p-4 text-sm text-red-800 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-800">
+                  {syncError}
+                </div>
+              )}
+
+              {syncProgress?.steps.every(s => s.status === 'completed') && (
+                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                  <Check className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
+                  <p className="font-semibold text-green-900 dark:text-green-100">¡Sincronización completada!</p>
+                </div>
+              )}
+            </div>
           </div>
-        );
+        )}
 
-      case 'defaultConfig':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold">Configuración Predeterminada</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Estos valores se aplicarán a todos tus locales. Podrás personalizar locales individuales en el siguiente paso.
+        {/* Step 2: Default Configuration */}
+        {currentStep === 'defaultConfig' && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8">
+            <div className="text-center mb-6">
+              <div className="inline-flex p-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 mb-4">
+                <Settings className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                Configura tus márgenes
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
+                Estos valores nos ayudan a calcular tus ganancias reales
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="defaultPlatformCommission">Comisión de Plataforma (%)</Label>
-                <Input
-                  id="defaultPlatformCommission"
-                  type="number"
-                  value={defaultConfig.platformCommission}
-                  onChange={(e) => setDefaultConfig({ ...defaultConfig, platformCommission: Number(e.target.value) })}
-                  min="0"
-                  max="100"
-                />
-                <p className="text-xs text-gray-500">Ej: PedidosYa cobra 15%</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="defaultMarkup">Markup (%)</Label>
-                <Input
-                  id="defaultMarkup"
-                  type="number"
-                  value={defaultConfig.markupPercentage}
-                  onChange={(e) => setDefaultConfig({ ...defaultConfig, markupPercentage: Number(e.target.value) })}
-                  min="0"
-                  max="100"
-                />
-                <p className="text-xs text-gray-500">Porcentaje de incremento sobre el costo</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="defaultCostOfGoods">CMV - Costo de Mercadería (%)</Label>
-                <Input
-                  id="defaultCostOfGoods"
-                  type="number"
-                  value={defaultConfig.costOfGoods}
-                  onChange={(e) => setDefaultConfig({ ...defaultConfig, costOfGoods: Number(e.target.value) })}
-                  min="0"
-                  max="100"
-                />
-                <p className="text-xs text-gray-500">Costo de insumos como % del precio de venta</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="defaultFixedCosts">Costos Fijos Mensuales ($)</Label>
-                <Input
-                  id="defaultFixedCosts"
-                  type="number"
-                  value={defaultConfig.fixedMonthlyCosts}
-                  onChange={(e) => setDefaultConfig({ ...defaultConfig, fixedMonthlyCosts: Number(e.target.value) })}
-                  min="0"
-                />
-                <p className="text-xs text-gray-500">Alquiler, servicios, sueldos</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="defaultPackagingCost">Costo de Packaging ($)</Label>
-                <Input
-                  id="defaultPackagingCost"
-                  type="number"
-                  value={defaultConfig.packagingCost}
-                  onChange={(e) => setDefaultConfig({ ...defaultConfig, packagingCost: Number(e.target.value) })}
-                  min="0"
-                />
-                <p className="text-xs text-gray-500">Empaquetado por pedido</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="defaultDeliveryCost">Costo de Delivery ($)</Label>
-                <Input
-                  id="defaultDeliveryCost"
-                  type="number"
-                  value={defaultConfig.deliveryCost}
-                  onChange={(e) => setDefaultConfig({ ...defaultConfig, deliveryCost: Number(e.target.value) })}
-                  min="0"
-                />
-                <p className="text-xs text-gray-500">Costo de envío por pedido</p>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              {Object.entries({
+                platformCommission: { label: 'Comisión plataforma', suffix: '%', icon: BarChart3 },
+                markupPercentage: { label: 'Margen deseado', suffix: '%', icon: Target },
+                costOfGoods: { label: 'Costo de productos', suffix: '%', icon: UtensilsCrossed },
+                fixedMonthlyCosts: { label: 'Costos fijos mensuales', suffix: '$', icon: Home },
+              }).map(([key, { label, suffix, icon: Icon }]) => (
+                <div key={key} className="space-y-2">
+                  <Label className="text-sm sm:text-base flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-blue-600" />
+                    {label}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      value={defaultConfig[key as keyof typeof defaultConfig]}
+                      onChange={(e) => setDefaultConfig({
+                        ...defaultConfig,
+                        [key]: parseFloat(e.target.value) || 0
+                      })}
+                      className="h-10 sm:h-11 pr-8"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                      {suffix}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        );
+        )}
 
-      case 'storeConfig':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold">Configuración por Local</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Se detectaron {storesWithConfig.length} locales. Puedes personalizar la configuración de cada uno individualmente.
+        {/* Step 3: Store Configuration */}
+        {currentStep === 'storeConfig' && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8">
+            <div className="text-center mb-6">
+              <div className="inline-flex p-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 mb-4">
+                <Home className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                Configura tus locales
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
+                Personaliza la configuración por local si lo necesitas
               </p>
             </div>
 
             <div className="space-y-4">
               {storesWithConfig.map((store) => (
-                <Card key={store.id} className={`border-2 transition-all ${
-                  store.useCustomConfig ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/10' : 'border-gray-200 dark:border-gray-700'
-                }`}>
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h4 className="font-semibold text-lg">{store.name}</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {store.chainName}
-                          {store.city && ` • ${store.city}`}
-                          {store.country && ` • ${store.country}`}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => toggleStoreCustomConfig(store.id)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                          store.useCustomConfig
-                            ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                        }`}
-                      >
-                        {store.useCustomConfig ? 'Personalizado' : 'Usar valores predeterminados'}
-                      </button>
+                <Card key={store.id} className="p-4 sm:p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">{store.name}</h3>
+                      {store.chainName && (
+                        <p className="text-sm text-gray-500">{store.chainName}</p>
+                      )}
                     </div>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={store.useCustomConfig}
+                        onChange={(e) => {
+                          setStoresWithConfig(storesWithConfig.map(s =>
+                            s.id === store.id ? { ...s, useCustomConfig: e.target.checked } : s
+                          ));
+                        }}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <span>Configuración personalizada</span>
+                    </label>
+                  </div>
 
-                    {store.useCustomConfig && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <div className="space-y-2">
-                          <Label>Comisión de Plataforma (%)</Label>
+                  {store.useCustomConfig && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      {Object.entries({
+                        platformCommission: 'Comisión %',
+                        markupPercentage: 'Margen %',
+                        costOfGoods: 'Costo %',
+                      }).map(([key, label]) => (
+                        <div key={key} className="space-y-1">
+                          <Label className="text-xs">{label}</Label>
                           <Input
                             type="number"
-                            value={(store.config?.platformCommission ?? defaultConfig.platformCommission) ?? 0}
-                            onChange={(e) => updateStoreConfig(store.id, 'platformCommission', Number(e.target.value))}
-                            min="0"
-                            max="100"
+                            value={store.config?.[key as keyof typeof store.config] || ''}
+                            onChange={(e) => {
+                              setStoresWithConfig(storesWithConfig.map(s =>
+                                s.id === store.id ? {
+                                  ...s,
+                                  config: { ...s.config, [key]: parseFloat(e.target.value) || 0 }
+                                } : s
+                              ));
+                            }}
+                            className="h-9"
                           />
                         </div>
-
-                        <div className="space-y-2">
-                          <Label>Markup (%)</Label>
-                          <Input
-                            type="number"
-                            value={(store.config?.markupPercentage ?? defaultConfig.markupPercentage) ?? 0}
-                            onChange={(e) => updateStoreConfig(store.id, 'markupPercentage', Number(e.target.value))}
-                            min="0"
-                            max="100"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>CMV - Costo de Mercadería (%)</Label>
-                          <Input
-                            type="number"
-                            value={(store.config?.costOfGoods ?? defaultConfig.costOfGoods) ?? 0}
-                            onChange={(e) => updateStoreConfig(store.id, 'costOfGoods', Number(e.target.value))}
-                            min="0"
-                            max="100"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Costos Fijos Mensuales ($)</Label>
-                          <Input
-                            type="number"
-                            value={(store.config?.fixedMonthlyCosts ?? defaultConfig.fixedMonthlyCosts) ?? 0}
-                            onChange={(e) => updateStoreConfig(store.id, 'fixedMonthlyCosts', Number(e.target.value))}
-                            min="0"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Costo de Packaging ($)</Label>
-                          <Input
-                            type="number"
-                            value={(store.config?.packagingCost ?? defaultConfig.packagingCost) ?? 0}
-                            onChange={(e) => updateStoreConfig(store.id, 'packagingCost', Number(e.target.value))}
-                            min="0"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Costo de Delivery ($)</Label>
-                          <Input
-                            type="number"
-                            value={(store.config?.deliveryCost ?? defaultConfig.deliveryCost) ?? 0}
-                            onChange={(e) => updateStoreConfig(store.id, 'deliveryCost', Number(e.target.value))}
-                            min="0"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
+                      ))}
+                    </div>
+                  )}
                 </Card>
               ))}
             </div>
-
-            <div className="text-center">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setStoresWithConfig(storesWithConfig.map(store => ({
-                    ...store,
-                    useCustomConfig: false,
-                    config: {},
-                  })));
-                }}
-                className="text-gray-600 dark:text-gray-400"
-              >
-                Restablecer todos a valores predeterminados
-              </Button>
-            </div>
           </div>
-        );
+        )}
 
-      case 'objectives':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold">Configura tus Objetivos</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Define qué quieres lograr para que tu agencia pueda ayudarte mejor
+        {/* Step 4: Objectives */}
+        {currentStep === 'objectives' && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8">
+            <div className="text-center mb-6">
+              <div className="inline-flex p-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 mb-4">
+                <Target className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                Define tus objetivos
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
+                Establece metas para medir tu progreso
               </p>
             </div>
 
             <div className="space-y-4">
-              {objectives.map((objective, index) => (
-                <Card key={index} className="relative">
-                  <CardContent className="pt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label>Objetivo</Label>
-                        <select
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-600"
-                          value={objective.type}
-                          onChange={(e) => updateObjective(index, 'type', e.target.value)}
-                        >
-                          {Object.entries(objectiveTypeLabels).map(([key, label]) => (
-                            <option key={key} value={key}>{label}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Valor</Label>
-                        <Input
-                          type="number"
-                          value={objective.target}
-                          onChange={(e) => updateObjective(index, 'target', Number(e.target.value))}
-                          min="0"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Unidad</Label>
-                        <select
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-600"
-                          value={objective.unit}
-                          onChange={(e) => updateObjective(index, 'unit', e.target.value)}
-                        >
-                          <option value="PERCENTAGE">%</option>
-                          <option value="CURRENCY">$</option>
-                          <option value="MINUTES">min</option>
-                        </select>
-                      </div>
+              {objectives.map((objective) => (
+                <Card key={objective.id} className="p-4 sm:p-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tipo</Label>
+                      <select
+                        value={objective.type}
+                        onChange={(e) => updateObjective(objective.id, { type: e.target.value as ObjectiveType })}
+                        className="w-full h-9 px-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent text-sm"
+                      >
+                        {Object.entries(objectiveTypeLabels).map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </select>
                     </div>
 
-                    {objectives.length > 1 && (
-                      <button
-                        onClick={() => removeObjective(index)}
-                        className="absolute top-2 right-2 text-red-600 hover:text-red-700 text-sm"
+                    <div className="space-y-1">
+                      <Label className="text-xs">Meta</Label>
+                      <Input
+                        type="number"
+                        value={objective.target}
+                        onChange={(e) => updateObjective(objective.id, { target: parseFloat(e.target.value) || 0 })}
+                        className="h-9"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs">Unidad</Label>
+                      <select
+                        value={objective.unit}
+                        onChange={(e) => updateObjective(objective.id, { unit: e.target.value as ObjectiveUnit })}
+                        className="w-full h-9 px-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent text-sm"
+                      >
+                        {Object.entries(objectiveUnitLabels).map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-end">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => removeObjective(objective.id)}
+                        className="w-full h-9"
                       >
                         Eliminar
-                      </button>
-                    )}
-                  </CardContent>
+                      </Button>
+                    </div>
+                  </div>
                 </Card>
               ))}
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addObjective}
+                className="w-full h-10 sm:h-11 border-2 border-dashed"
+              >
+                + Agregar objetivo
+              </Button>
             </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={addObjective}
-              className="w-full"
-            >
-              + Agregar Otro Objetivo
-            </Button>
           </div>
-        );
+        )}
 
-      case 'summary':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold">Resumen de Configuración</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Revisa tu configuración antes de confirmar
+        {/* Step 5: Summary */}
+        {currentStep === 'summary' && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8">
+            <div className="text-center mb-6">
+              <div className="inline-flex p-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 mb-4">
+                <Check className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                ¡Todo listo!
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
+                Revisa tu configuración antes de comenzar
               </p>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Configuración Predeterminada</CardTitle>
-                <CardDescription>Estos valores se aplican a todos los locales</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Comisión de plataforma:</span>
-                  <span className="font-medium">{defaultConfig.platformCommission}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Markup:</span>
-                  <span className="font-medium">{defaultConfig.markupPercentage}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>CMV:</span>
-                  <span className="font-medium">{defaultConfig.costOfGoods}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Costos fijos:</span>
-                  <span className="font-medium">${defaultConfig.fixedMonthlyCosts.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Costo de packaging:</span>
-                  <span className="font-medium">${defaultConfig.packagingCost.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Costo de delivery:</span>
-                  <span className="font-medium">${defaultConfig.deliveryCost.toLocaleString()}</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {storesWithConfig.filter(s => s.useCustomConfig).length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Locales con Configuración Personalizada</CardTitle>
-                  <CardDescription>
-                    {storesWithConfig.filter(s => s.useCustomConfig).length} de {storesWithConfig.length} locales
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {storesWithConfig.filter(s => s.useCustomConfig).map((store) => (
-                    <div key={store.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <h4 className="font-medium mb-2">{store.name}</h4>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400">Comisión:</span>
-                          <span className="font-medium">{(store.config?.platformCommission ?? defaultConfig.platformCommission) ?? 0}%</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400">Markup:</span>
-                          <span className="font-medium">{(store.config?.markupPercentage ?? defaultConfig.markupPercentage) ?? 0}%</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400">CMV:</span>
-                          <span className="font-medium">{(store.config?.costOfGoods ?? defaultConfig.costOfGoods) ?? 0}%</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400">Costos fijos:</span>
-                          <span className="font-medium">${((store.config?.fixedMonthlyCosts ?? defaultConfig.fixedMonthlyCosts) ?? 0).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
+            <div className="space-y-4">
+              <Card className="p-4">
+                <h3 className="font-semibold mb-2">Plataforma conectada</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  PedidosYa - {createdIntegration?.email}
+                </p>
               </Card>
-            )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Objetivos Configurados</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {objectives.map((objective, index) => (
-                  <div key={index} className="flex justify-between items-center">
-                    <span>{objectiveTypeLabels[objective.type]}</span>
-                    <span className="font-medium">
-                      {objective.target}{objectiveUnitLabels[objective.unit]}
-                    </span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        );
-    }
-  };
+              <Card className="p-4">
+                <h3 className="font-semibold mb-2">Locales sincronizados</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {storesWithConfig.length} locales configurados
+                </p>
+              </Card>
 
-  const canGoNext = () => {
-    if (currentStep === 'platform') {
-      return createdIntegration !== null;
-    }
-    if (currentStep === 'defaultConfig') {
-      return defaultConfig.platformCommission >= 0 && defaultConfig.markupPercentage >= 0;
-    }
-    if (currentStep === 'objectives') {
-      return objectives.length > 0 && objectives.every(o => o.target > 0);
-    }
-    return true;
-  };
-
-  const getCurrentStepNumber = () => {
-    switch (currentStep) {
-      case 'platform': return 1;
-      case 'defaultConfig': return 2;
-      case 'storeConfig': return 3;
-      case 'objectives': return 4;
-      case 'summary': return 5;
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-2">
-              {[1, 2, 3, 4, 5].map((step) => (
-                <div
-                  key={step}
-                  className={`flex items-center ${step < 5 ? 'flex-1' : ''}`}
-                >
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                      getCurrentStepNumber() === step
-                        ? 'bg-indigo-600 text-white'
-                        : getCurrentStepNumber() > step
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                    }`}
-                  >
-                    {getCurrentStepNumber() > step ? <Check className="h-4 w-4" /> : step}
-                  </div>
-                  {step < 5 && (
-                    <div className="flex-1 h-1 mx-2 bg-gray-200 dark:bg-gray-700">
-                      <div
-                        className={`h-full transition-all ${
-                          getCurrentStepNumber() > step ? 'bg-green-600' : 'bg-indigo-600'
-                        }`}
-                        style={{ width: getCurrentStepNumber() > step ? '100%' : '0%' }}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
+              {objectives.length > 0 && (
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-2">Objetivos establecidos</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {objectives.length} metas definidas
+                  </p>
+                </Card>
+              )}
             </div>
           </div>
+        )}
 
-          <CardTitle className="text-2xl">
-            {currentStep === 'platform' && 'Paso 1 de 5'}
-            {currentStep === 'defaultConfig' && 'Paso 2 de 5'}
-            {currentStep === 'storeConfig' && 'Paso 3 de 5'}
-            {currentStep === 'objectives' && 'Paso 4 de 5'}
-            {currentStep === 'summary' && 'Paso 5 de 5'}
-          </CardTitle>
-          <CardDescription>
-            {currentStep === 'platform' && 'Conecta una plataforma de delivery'}
-            {currentStep === 'defaultConfig' && 'Configura los valores predeterminados'}
-            {currentStep === 'storeConfig' && 'Personaliza la configuración por local'}
-            {currentStep === 'objectives' && 'Define tus objetivos de negocio'}
-            {currentStep === 'summary' && 'Confirma tu configuración'}
-          </CardDescription>
-        </CardHeader>
+        {/* Navigation Buttons */}
+        <div className="flex items-center justify-between mt-6 gap-4">
+          <Button
+            variant="outline"
+            onClick={() => {
+              const prevStep = steps[Math.max(0, currentStepIndex - 1)];
+              setCurrentStep(prevStep.id as Step);
+            }}
+            disabled={currentStepIndex === 0}
+            className="flex-1 sm:flex-none h-10 sm:h-11"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">Anterior</span>
+          </Button>
 
-        <CardContent>
-          {renderStep()}
-
-          <div className="flex justify-between mt-8">
+          {currentStep !== 'summary' ? (
             <Button
-              variant="outline"
               onClick={() => {
-                if (currentStep === 'defaultConfig') setCurrentStep('platform');
-                if (currentStep === 'storeConfig') setCurrentStep('defaultConfig');
-                if (currentStep === 'objectives') setCurrentStep('storeConfig');
-                if (currentStep === 'summary') setCurrentStep('objectives');
+                const nextStep = steps[Math.min(steps.length - 1, currentStepIndex + 1)];
+                setCurrentStep(nextStep.id as Step);
               }}
-              disabled={currentStep === 'platform'}
+              disabled={currentStep === 'platform' && !createdIntegration}
+              className="flex-1 sm:flex-none h-10 sm:h-11 bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/30"
             >
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Anterior
+              <span className="hidden sm:inline">Siguiente</span>
+              <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
-
-            {currentStep !== 'summary' ? (
-              <Button
-                onClick={() => {
-                  if (currentStep === 'platform') setCurrentStep('defaultConfig');
-                  if (currentStep === 'defaultConfig') setCurrentStep('storeConfig');
-                  if (currentStep === 'storeConfig') setCurrentStep('objectives');
-                  if (currentStep === 'objectives') setCurrentStep('summary');
-                }}
-                disabled={!canGoNext()}
-              >
-                Siguiente
-                <ChevronRight className="h-4 w-4 ml-2" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleSubmit}
-                disabled={isLoading}
-                className="bg-indigo-600 hover:bg-indigo-700"
-              >
-                {isLoading ? 'Guardando...' : 'Completar Configuración'}
-                <Check className="h-4 w-4 ml-2" />
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          ) : (
+            <Button
+              onClick={handleCompleteOnboarding}
+              disabled={isLoading}
+              className="flex-1 sm:flex-none h-10 sm:h-11 bg-green-600 hover:bg-green-700 shadow-lg shadow-green-500/30"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-1" />
+                  Completar
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,20 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { Utensils, Loader2, Store, Package, DollarSign } from 'lucide-react';
+import { Utensils, Store, Package, DollarSign, Grid3x3, X, Filter } from 'lucide-react';
 import { platformIntegrationsService } from '../services/platformIntegrationsService';
 import { menuService } from '../services/menuService';
-import { Card, CardContent } from '@/components/ui/card';
 import { MenuTable } from '@/components/menu/MenuTable';
 import { StoreSelector, type StoreWithPlatform } from '@/components/menu/StoreSelector';
 import { Badge } from '@/components/ui/badge';
-import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function MenuPage() {
   const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  // Fetch menu items from backend with filters
   const { data: menuData, isLoading } = useQuery({
     queryKey: ['menu-items', selectedStoreIds],
     queryFn: () =>
@@ -28,13 +25,11 @@ export function MenuPage() {
     queryFn: platformIntegrationsService.list,
   });
 
-  // Get store list for selector from menu items
   const storesWithPlatform: StoreWithPlatform[] = useMemo(() => {
     if (!menuData?.items) return [];
 
     const defaultPlatform = integrationsData?.integrations?.[0]?.platform || 'PEDIDOS_YA';
 
-    // Extract unique stores from menu items
     const uniqueStores = new Map<string, StoreWithPlatform>();
     menuData.items.forEach((item) => {
       item.stores.forEach((store) => {
@@ -52,7 +47,6 @@ export function MenuPage() {
     return Array.from(uniqueStores.values());
   }, [menuData, integrationsData]);
 
-  // Filter items by selected category (client-side)
   const filteredItems = useMemo(() => {
     if (!menuData?.items) return [];
     if (!selectedCategory) return menuData.items;
@@ -68,202 +62,199 @@ export function MenuPage() {
   const categoryStats = menuData?.categories || [];
   const uniqueCategories = categoryStats.length;
 
-  // Handle clear selections
-  const handleClearStoreSelection = () => {
-    setSelectedStoreIds([]);
-  };
+  const StatCard = ({ title, value, icon: Icon, color }: {
+    title: string;
+    value: string | number;
+    icon: any;
+    color: string;
+  }) => {
+    const colorClasses = {
+      blue: 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-500/30',
+      purple: 'bg-gradient-to-br from-purple-500 to-purple-600 shadow-purple-500/30',
+      green: 'bg-gradient-to-br from-green-500 to-green-600 shadow-green-500/30',
+      orange: 'bg-gradient-to-br from-orange-500 to-orange-600 shadow-orange-500/30',
+    };
 
-  const handleClearCategorySelection = () => {
-    setSelectedCategory(null);
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-shadow">
+        <div className="flex items-center gap-4">
+          <div className={`p-3 rounded-xl ${colorClasses[color as keyof typeof colorClasses]} shadow-lg`}>
+            <Icon className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{value}</p>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (isLoading) {
     return (
-      <main className="py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 mb-4">
+            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
           </div>
+          <p className="text-gray-600 dark:text-gray-400">Cargando menú...</p>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (!menuData?.items || menuData.items.length === 0) {
     return (
-      <main className="py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="text-center py-12">
-            <Utensils className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              No hay datos de menú
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              Conecta una plataforma y sincroniza tus datos para ver tu menú.
-            </p>
+      <div className="px-4 sm:px-6 lg:px-8 py-6">
+        <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
+          <div className="inline-flex p-4 rounded-full bg-blue-100 dark:bg-blue-900/30 mb-4">
+            <Utensils className="h-8 w-8 text-blue-600 dark:text-blue-400" />
           </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            No hay datos de menú
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+            Conecta una plataforma de delivery y sincroniza tus datos para ver tu menú y analizar el rendimiento de tus productos.
+          </p>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="py-6 sm:px-6 lg:px-8">
-      <div className="px-4 py-6 sm:px-0">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Menu / Catalog Performance</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Analyze your menu items and catalog performance
-          </p>
-        </div>
+    <div className="px-4 sm:px-6 lg:px-8 py-6">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+          Menú y Catálogo
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Analiza el rendimiento de tus productos y categorías
+        </p>
+      </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <Utensils className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Items</dt>
-                    <dd className="text-lg font-medium text-gray-900 dark:text-white">{totalItems}</dd>
-                  </dl>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+        <StatCard
+          title="Productos Totales"
+          value={totalItems}
+          icon={Grid3x3}
+          color="blue"
+        />
+        <StatCard
+          title="Categorías"
+          value={uniqueCategories}
+          icon={Package}
+          color="purple"
+        />
+        <StatCard
+          title="Precio Promedio"
+          value={`$${avgPrice.toFixed(2)}`}
+          icon={DollarSign}
+          color="green"
+        />
+        <StatCard
+          title="Locales"
+          value={storesWithPlatform.length}
+          icon={Store}
+          color="orange"
+        />
+      </div>
 
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <Package className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+      {/* Categories Sidebar + Menu Table */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Categories Sidebar */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-6">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 border border-gray-100 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Categorías
+                  </h3>
                 </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Categories</dt>
-                    <dd className="text-lg font-medium text-gray-900 dark:text-white">
-                      {uniqueCategories}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Avg. Price</dt>
-                    <dd className="text-lg font-medium text-gray-900 dark:text-white">
-                      ${avgPrice.toFixed(2)}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <Store className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Stores</dt>
-                    <dd className="text-lg font-medium text-gray-900 dark:text-white">
-                      {storesWithPlatform.length}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Categories Sidebar + Menu Table */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Categories Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Categories
-                </h3>
                 {selectedCategory && (
                   <button
-                    onClick={handleClearCategorySelection}
-                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                    onClick={() => setSelectedCategory(null)}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1 font-medium"
                   >
                     <X className="h-3 w-3" />
-                    Clear
+                    Limpiar
                   </button>
                 )}
               </div>
+
               <div className="space-y-1">
                 <button
                   onClick={() => setSelectedCategory(null)}
                   className={cn(
-                    "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
+                    "w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-between group",
                     !selectedCategory
-                      ? "bg-primary text-primary-foreground font-medium"
-                      : "hover:bg-muted text-muted-foreground"
+                      ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
+                      : "text-gray-900 dark:text-gray-100 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                   )}
                 >
-                  All Items
-                  <span className="ml-2 text-xs opacity-70">({menuData.stats.totalItems})</span>
+                  <span>Todos</span>
+                  <span className={cn(
+                    "text-xs px-2 py-0.5 rounded-full",
+                    !selectedCategory
+                      ? "bg-white/20 text-white"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                  )}>
+                    {menuData.stats.totalItems}
+                  </span>
                 </button>
+
                 {categoryStats.map((category) => (
                   <button
                     key={category.name}
                     onClick={() => setSelectedCategory(category.name)}
                     className={cn(
-                      "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
+                      "w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-between group",
                       selectedCategory === category.name
-                        ? "bg-primary text-primary-foreground font-medium"
-                        : "hover:bg-muted text-muted-foreground"
+                        ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
+                        : "text-gray-900 dark:text-gray-100 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                     )}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="truncate">{category.name}</span>
-                      <span className="ml-2 text-xs opacity-70 flex-shrink-0">
-                        ({category.itemCount})
-                      </span>
-                    </div>
+                    <span className="truncate">{category.name}</span>
+                    <span className={cn(
+                      "text-xs px-2 py-0.5 rounded-full flex-shrink-0 ml-2",
+                      selectedCategory === category.name
+                        ? "bg-white/20 text-white"
+                        : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                    )}>
+                      {category.itemCount}
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Menu Table Section */}
-          <div className="lg:col-span-3 space-y-4">
+        {/* Menu Table Section */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* Table Header */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 border border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {selectedCategory || 'All Items'}
+                  {selectedCategory || 'Todos los Productos'}
                 </h2>
-                <p className="text-sm text-muted-foreground">
-                  {totalItems} item{totalItems !== 1 ? 's' : ''}
-                  {selectedCategory && ` in ${selectedCategory}`}
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  {totalItems} producto{totalItems !== 1 ? 's' : ''}
+                  {selectedCategory && ` en ${selectedCategory}`}
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 {selectedStoreIds.length > 0 && (
-                  <Badge variant="secondary" className="gap-1">
-                    {selectedStoreIds.length} store{selectedStoreIds.length > 1 ? 's' : ''} filtered
+                  <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-0">
+                    <Store className="h-3 w-3" />
+                    {selectedStoreIds.length} local{selectedStoreIds.length > 1 ? 'es' : ''}
                     <button
-                      onClick={handleClearStoreSelection}
-                      className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
+                      onClick={() => setSelectedStoreIds([])}
+                      className="ml-1 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5 transition-colors"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -277,10 +268,12 @@ export function MenuPage() {
                 />
               </div>
             </div>
-            <MenuTable items={filteredItems} />
           </div>
+
+          {/* Menu Table */}
+          <MenuTable items={filteredItems} />
         </div>
       </div>
-    </main>
+    </div>
   );
 }

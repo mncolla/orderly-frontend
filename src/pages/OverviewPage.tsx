@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, Clock, AlertTriangle } from 'lucide-react';
+import { DollarSign, ShoppingCart, Clock, AlertTriangle, ArrowUpRight, ArrowDownRight, Target, Calendar } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOverview } from '../hooks/useOverview';
 import { ChartLineMultiple } from '@/components/ChartLineMultiple';
@@ -16,19 +16,11 @@ export function OverviewPage() {
   const [userHasChangedDates, setUserHasChangedDates] = useState(false);
   const [objectives, setObjectives] = useState<any[]>([]);
 
-  // Parse search params from window.location (Wouter's useLocation doesn't include query params)
+  // Parse search params from window.location
   const searchParams = new URLSearchParams(window.location.search);
   const agencyView = searchParams.get('agencyView') === 'true';
   const agencyUserId = searchParams.get('userId');
   const agencyStoreId = searchParams.get('storeId');
-
-  // DEBUG: Log para verificar qué se está detectando
-  console.log('📍 window.location.href:', window.location.href);
-  console.log('📍 window.location.search:', window.location.search);
-  console.log('🔍 searchParams:', Object.fromEntries(searchParams));
-  console.log('✅ agencyView:', agencyView);
-  console.log('👤 agencyUserId:', agencyUserId);
-  console.log('🏪 agencyStoreId:', agencyStoreId);
 
   const [agencyUserName, setAgencyUserName] = useState<string>('');
   const [agencyStoreName, setAgencyStoreName] = useState<string>('');
@@ -36,54 +28,32 @@ export function OverviewPage() {
   // Fetch agency user/store info when in agency mode
   useEffect(() => {
     if (agencyView && agencyUserId) {
-      console.log('🔍 Agency mode: fetching user info', { agencyUserId });
-
-      // Fetch user info
       fetch(`/api/auth/users/${agencyUserId}`, {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
         },
       })
-        .then(res => {
-          console.log('📡 User API response status:', res.status);
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-          }
-          return res.json();
-        })
+        .then(res => res.json())
         .then(data => {
-          console.log('✅ User data received:', data);
           setAgencyUserName(data.name || 'Usuario');
         })
-        .catch(err => {
-          console.error('❌ Error fetching user:', err);
+        .catch(() => {
           setAgencyUserName('Usuario');
         });
 
-      // Fetch store info if storeId provided
       if (agencyStoreId) {
-        console.log('🔍 Agency mode: fetching store info', { agencyStoreId });
-
         fetch(`/api/stores/${agencyStoreId}`, {
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
           },
         })
-          .then(res => {
-            console.log('📡 Store API response status:', res.status);
-            if (!res.ok) {
-              throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-            }
-            return res.json();
-          })
+          .then(res => res.json())
           .then(data => {
-            console.log('✅ Store data received:', data);
             setAgencyStoreName(data.store?.name || 'Store');
           })
-          .catch(err => {
-            console.error('❌ Error fetching store:', err);
+          .catch(() => {
             setAgencyStoreName('Store');
           });
       }
@@ -102,20 +72,15 @@ export function OverviewPage() {
         }
   );
 
-  // Cargar objetivos del usuario
   useEffect(() => {
     if (user?.integrations && user.integrations.length > 0) {
-      // Obtener la primera integración (los owners típicamente tienen una sola)
       const integrationId = user.integrations[0].id;
       platformIntegrationsService.getById(integrationId).then(() => {
-        // Por ahora, no hay objetivos en la nueva estructura
-        // Se pueden agregar más tarde si es necesario
         setObjectives([]);
       });
     }
   }, [user]);
 
-  // Sincronizar el estado con el periodo que devuelve el backend (solo primera carga)
   useEffect(() => {
     if (overview?.period && !userHasChangedDates) {
       setDateRange({
@@ -125,7 +90,6 @@ export function OverviewPage() {
     }
   }, [overview?.period, userHasChangedDates]);
 
-  // Handler para cuando el usuario selecciona fechas
   const handleDateChange = (range: DateRange | undefined) => {
     if (range) {
       setDateRange(range);
@@ -135,24 +99,31 @@ export function OverviewPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-gray-600 dark:text-gray-400">Cargando...</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 mb-4">
+            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+          <p className="text-gray-600 dark:text-gray-400">Cargando dashboard...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
-    console.error('❌ Overview error:', error);
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4">
-        <div className="text-red-600 dark:text-red-400 text-center">
-          <p className="font-semibold text-lg">Error al cargar los datos</p>
-          <p className="text-sm mt-2">
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-4">
+        <div className="text-center">
+          <div className="inline-flex p-4 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
+            <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" />
+          </div>
+          <p className="text-red-600 dark:text-red-400 font-semibold text-lg">Error al cargar los datos</p>
+          <p className="text-sm text-gray-500 mt-2">
             {error instanceof Error ? error.message : 'Error desconocido'}
           </p>
         </div>
         {agencyView && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 max-w-md">
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 max-w-md">
             <p className="text-sm text-yellow-800 dark:text-yellow-200">
               ⚠️ <strong>Modo Agencia:</strong> Verifica que tengas permisos para ver las métricas de este usuario/store.
             </p>
@@ -164,139 +135,121 @@ export function OverviewPage() {
 
   const kpis = overview?.kpis;
 
+  const KPICard = ({ title, value, change, icon: Icon, color, trend }: {
+    title: string;
+    value: string;
+    change?: number;
+    icon: any;
+    color: string;
+    trend?: 'up' | 'down' | 'neutral';
+  }) => {
+    const colorClasses = {
+      green: 'bg-gradient-to-br from-green-500 to-green-600 shadow-green-500/30',
+      blue: 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-500/30',
+      purple: 'bg-gradient-to-br from-purple-500 to-purple-600 shadow-purple-500/30',
+      orange: 'bg-gradient-to-br from-orange-500 to-orange-600 shadow-orange-500/30',
+    };
+
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-shadow">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`p-2 rounded-xl ${colorClasses[color as keyof typeof colorClasses]} shadow-lg`}>
+                <Icon className="h-5 w-5 text-white" />
+              </div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
+            </div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white mt-3">{value}</p>
+          </div>
+          {change !== undefined && change !== 0 && (
+            <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-medium ${
+              (trend === 'up' || change > 0) ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+              (trend === 'down' || change < 0) ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+              'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
+            }`}>
+              {change > 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+              <span>{Math.abs(change)}%</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
-      {/* Agency Context Banner */}
       <AgencyContextBanner
         userName={agencyUserName}
         storeName={agencyStoreName}
         currentView="overview"
       />
 
-      <main className={`${agencyView ? 'pt-0' : 'py-6'} sm:px-6 lg:px-8`}>
-        <div className="px-4 py-6 sm:px-0">
+      <div className="px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="gap-6 mb-6 flex flex-col items-start">
-          <div className="">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              {agencyView ? 'Dashboard' : 'Overview'}
-            </h1>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">
-              {agencyView && agencyUserName
-                ? `Analizando métricas de ${agencyUserName}${agencyStoreName ? ` - ${agencyStoreName}` : ''}`
-                : `Bienvenido, ${user?.name}`
-              }
-            </p>
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+                {agencyView ? 'Dashboard' : 'Resumen'}
+              </h1>
+              <p className="mt-2 text-gray-600 dark:text-gray-400">
+                {agencyView && agencyUserName
+                  ? `Analizando métricas de ${agencyUserName}${agencyStoreName ? ` - ${agencyStoreName}` : ''}`
+                  : `Hola, ${user?.name?.split(' ')[0]} 👋`
+                }
+              </p>
+            </div>
+            <DatePickerWithRange
+              value={dateRange}
+              onChange={handleDateChange}
+            />
           </div>
-          <DatePickerWithRange
-            value={dateRange}
-            onChange={handleDateChange}
-          />
+
+          {/* Period Badge */}
+          {overview?.period && (
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 rounded-full border border-blue-200 dark:border-blue-800">
+              <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                {new Date(overview.period.start).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                {' - '}
+                {new Date(overview.period.end).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+            </div>
+          )}
         </div>
 
-        
-
         {/* KPIs Grid */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          {/* Revenue */}
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revenue</p>
-                    <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                      {kpis?.revenue.formatted || '$0'}
-                    </p>
-                  </div>
-                </div>
-                {(kpis?.revenue?.change ?? 0) !== 0 && (
-                  <div className={`flex items-center ${(kpis?.revenue?.change ?? 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {(kpis?.revenue?.change ?? 0) > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                    <span className="ml-1 text-sm font-medium">{Math.abs(kpis?.revenue?.change ?? 0)}%</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Orders */}
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <ShoppingCart className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Orders</p>
-                    <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                      {kpis?.orders.current || 0}
-                    </p>
-                  </div>
-                </div>
-                {(kpis?.orders?.change ?? 0) !== 0 && (
-                  <div className={`flex items-center ${(kpis?.orders?.change ?? 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {(kpis?.orders?.change ?? 0) > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                    <span className="ml-1 text-sm font-medium">{Math.abs(kpis?.orders?.change ?? 0)}%</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Avg Ticket */}
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <DollarSign className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Avg Ticket</p>
-                    <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                      {kpis?.avgTicket.formatted || '$0'}
-                    </p>
-                  </div>
-                </div>
-                {(kpis?.avgTicket?.change ?? 0) !== 0 && (
-                  <div className={`flex items-center ${(kpis?.avgTicket?.change ?? 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {(kpis?.avgTicket?.change ?? 0) > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                    <span className="ml-1 text-sm font-medium">{Math.abs(kpis?.avgTicket?.change ?? 0)}%</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Cancel Rate */}
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <Clock className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Cancel Rate</p>
-                    <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                      {kpis?.cancelRate.formatted || '0%'}
-                    </p>
-                  </div>
-                </div>
-                {(kpis?.cancelRate?.change ?? 0) !== 0 && (
-                  <div className={`flex items-center ${(kpis?.cancelRate?.change ?? 0) < 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {(kpis?.cancelRate?.change ?? 0) < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-                    <span className="ml-1 text-sm font-medium">{Math.abs(kpis?.cancelRate?.change ?? 0)}%</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+          <KPICard
+            title="Ingresos"
+            value={kpis?.revenue.formatted || '$0'}
+            change={kpis?.revenue?.change}
+            icon={DollarSign}
+            color="green"
+          />
+          <KPICard
+            title="Pedidos"
+            value={kpis?.orders.current.toLocaleString() || '0'}
+            change={kpis?.orders?.change}
+            icon={ShoppingCart}
+            color="blue"
+          />
+          <KPICard
+            title="Ticket Promedio"
+            value={kpis?.avgTicket.formatted || '$0'}
+            change={kpis?.avgTicket?.change}
+            icon={DollarSign}
+            color="purple"
+          />
+          <KPICard
+            title="Tasa Cancelación"
+            value={kpis?.cancelRate.formatted || '0%'}
+            change={kpis?.cancelRate?.change}
+            icon={Clock}
+            color="orange"
+            trend="down"
+          />
         </div>
 
         {/* Objectives Card */}
@@ -308,39 +261,57 @@ export function OverviewPage() {
 
         {/* Principal Chart */}
         {overview?.chart && (
-          <ChartLineMultiple
-            data={overview.chart.daily}
-            period={overview.period}
-          />
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 mb-8">
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Ingresos vs Pedidos</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Evolución diaria del periodo seleccionado</p>
+            </div>
+            <ChartLineMultiple
+              data={overview.chart.daily}
+              period={overview.period}
+            />
+          </div>
         )}
 
         {/* Alerts */}
         {overview?.alerts && overview.alerts.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4 mt-6">Alertas y Sugerencias</h2>
-            <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Alertas y Sugerencias</h2>
+            </div>
+            <div className="grid grid-cols-1 gap-4">
               {overview.alerts.map((alert, index) => (
                 <div
                   key={index}
-                  className={`bg-white dark:bg-gray-800 shadow rounded-lg p-4 border-l-4 ${alert.severity === 'high' ? 'border-red-500' :
+                  className={`bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 border-l-4 transition-all hover:shadow-lg ${
+                    alert.severity === 'high' ? 'border-red-500' :
                     alert.severity === 'medium' ? 'border-yellow-500' :
-                      'border-blue-500'
-                    }`}
+                    'border-blue-500'
+                  }`}
                 >
-                  <div className="flex items-start">
-                    <AlertTriangle className={`h-5 w-5 mt-0.5 ${alert.severity === 'high' ? 'text-red-600 dark:text-red-400' :
-                      alert.severity === 'medium' ? 'text-yellow-600 dark:text-yellow-400' :
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${
+                      alert.severity === 'high' ? 'bg-red-100 dark:bg-red-900/30' :
+                      alert.severity === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/30' :
+                      'bg-blue-100 dark:bg-blue-900/30'
+                    }`}>
+                      <AlertTriangle className={`h-4 w-4 ${
+                        alert.severity === 'high' ? 'text-red-600 dark:text-red-400' :
+                        alert.severity === 'medium' ? 'text-yellow-600 dark:text-yellow-400' :
                         'text-blue-600 dark:text-blue-400'
                       }`} />
-                    <div className="ml-3 flex-1">
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">{alert.title}</h3>
-                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{alert.description}</p>
                     </div>
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${alert.severity === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{alert.title}</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{alert.description}</p>
+                    </div>
+                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                      alert.severity === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
                       alert.severity === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                        'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                      }`}>
-                      {alert.severity}
+                      'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                    }`}>
+                      {alert.severity === 'high' ? 'Alta' : alert.severity === 'medium' ? 'Media' : 'Baja'}
                     </span>
                   </div>
                 </div>
@@ -350,30 +321,39 @@ export function OverviewPage() {
         )}
 
         {/* Items Ranking and Platform Distribution */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 mt-6 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Items Ranking */}
           {overview?.itemsRanking && overview.itemsRanking.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-              <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Ranking de Productos</h3>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+              <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
+                <div className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Productos Top</h3>
+                </div>
               </div>
-              <div className="p-6">
+              <div className="p-6 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-16">#</TableHead>
                       <TableHead>Producto</TableHead>
-                      <TableHead>Cantidad</TableHead>
-                      <TableHead>Revenue</TableHead>
+                      <TableHead className="text-right">Cant.</TableHead>
+                      <TableHead className="text-right">Ingresos</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {overview.itemsRanking.map((item, index) => (
                       <TableRow key={index}>
-                        <TableCell className="font-medium">{index + 1}</TableCell>
-                        <TableCell>{item.productName}</TableCell>
-                        <TableCell>{item.quantitySold}</TableCell>
-                        <TableCell>${item.totalRevenue.toLocaleString()}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold text-sm">
+                            {index + 1}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium text-gray-900 dark:text-white">{item.productName}</TableCell>
+                        <TableCell className="text-right text-gray-600 dark:text-gray-400">{item.quantitySold}</TableCell>
+                        <TableCell className="text-right font-medium text-green-600 dark:text-green-400">
+                          ${item.totalRevenue.toLocaleString()}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -384,27 +364,33 @@ export function OverviewPage() {
 
           {/* Platform Distribution */}
           {overview?.platformDistribution && overview.platformDistribution.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-              <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Distribución por Plataforma</h3>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+              <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Por Plataforma</h3>
               </div>
-              <div className="p-6">
+              <div className="p-6 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Plataforma</TableHead>
-                      <TableHead>Orders</TableHead>
-                      <TableHead>Revenue</TableHead>
-                      <TableHead>%</TableHead>
+                      <TableHead className="text-right">Pedidos</TableHead>
+                      <TableHead className="text-right">Ingresos</TableHead>
+                      <TableHead className="text-right">%</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {overview.platformDistribution.map((platform) => (
-                      <TableRow key={platform.platform}>
-                        <TableCell className="font-medium">{platform.platform}</TableCell>
-                        <TableCell>{platform.orders}</TableCell>
-                        <TableCell>${platform.revenue.toLocaleString()}</TableCell>
-                        <TableCell>{platform.percentage}%</TableCell>
+                    {overview.platformDistribution.map((platform, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium text-gray-900 dark:text-white">{platform.platform}</TableCell>
+                        <TableCell className="text-right text-gray-600 dark:text-gray-400">{platform.orders}</TableCell>
+                        <TableCell className="text-right font-medium text-green-600 dark:text-green-400">
+                          ${platform.revenue.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            {platform.percentage.toFixed(1)}%
+                          </span>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -414,7 +400,6 @@ export function OverviewPage() {
           )}
         </div>
       </div>
-    </main>
     </>
   );
 }
