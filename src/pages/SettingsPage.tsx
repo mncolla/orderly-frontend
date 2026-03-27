@@ -50,6 +50,7 @@ export function SettingsPage() {
   const [storeConfig, setStoreConfig] = useState<StoreConfig>({
     platformCommission: null,
     markupPercentage: null,
+    costOfGoods: null,
     fixedMonthlyCosts: null,
     packagingCost: null,
     deliveryCost: null,
@@ -59,6 +60,7 @@ export function SettingsPage() {
   const [defaultConfig, setDefaultConfig] = useState<StoreConfig>({
     platformCommission: 15,
     markupPercentage: 30,
+    costOfGoods: 30, // 30% CMV por defecto
     fixedMonthlyCosts: 0,
     packagingCost: 0,
     deliveryCost: 0,
@@ -148,6 +150,7 @@ export function SettingsPage() {
     setStoreConfig({
       platformCommission: null,
       markupPercentage: null,
+      costOfGoods: null,
       fixedMonthlyCosts: null,
       packagingCost: null,
       deliveryCost: null,
@@ -348,6 +351,19 @@ export function SettingsPage() {
                     max="100"
                   />
                   <p className="text-xs text-gray-500">Porcentaje de incremento sobre el costo</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="defaultCostOfGoods">CMV - Costo de Mercadería (%)</Label>
+                  <Input
+                    id="defaultCostOfGoods"
+                    type="number"
+                    value={defaultConfig.costOfGoods || ''}
+                    onChange={(e) => setDefaultConfig({ ...defaultConfig, costOfGoods: Number(e.target.value) || null })}
+                    min="0"
+                    max="100"
+                  />
+                  <p className="text-xs text-gray-500">Costo de insumos como % del precio de venta</p>
                 </div>
 
                 <div className="space-y-2">
@@ -580,6 +596,20 @@ export function SettingsPage() {
                     min="0"
                     max="100"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="storeCostOfGoods">CMV - Costo de Mercadería (%)</Label>
+                  <Input
+                    id="storeCostOfGoods"
+                    type="number"
+                    value={storeConfig.costOfGoods || ''}
+                    onChange={(e) => setStoreConfig({ ...storeConfig, costOfGoods: Number(e.target.value) || null })}
+                    placeholder="Predeterminado"
+                    min="0"
+                    max="100"
+                  />
+                  <p className="text-xs text-gray-500">Costo de insumos como % del precio</p>
                 </div>
 
                 <div className="space-y-2">

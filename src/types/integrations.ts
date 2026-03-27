@@ -149,6 +149,7 @@ export type ConfigSource = 'store' | 'user';
 export interface StoreConfig {
   platformCommission: number | null;
   markupPercentage: number | null;
+  costOfGoods: number | null;
   fixedMonthlyCosts: number | null;
   packagingCost: number | null;
   deliveryCost: number | null;
@@ -167,6 +168,7 @@ export interface StoreConfigResponse {
 export interface StoreConfigCreateRequest {
   platformCommission?: number;
   markupPercentage?: number;
+  costOfGoods?: number;
   fixedMonthlyCosts?: number;
   packagingCost?: number;
   deliveryCost?: number;
@@ -175,6 +177,7 @@ export interface StoreConfigCreateRequest {
 export interface StoreConfigUpdateRequest {
   platformCommission?: number;
   markupPercentage?: number;
+  costOfGoods?: number;
   fixedMonthlyCosts?: number;
   packagingCost?: number;
   deliveryCost?: number;
