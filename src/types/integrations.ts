@@ -1,5 +1,24 @@
 export type DeliveryPlatform = 'PEDIDOS_YA' | 'RAPPI' | 'GLOVO' | 'UBER_EATS';
 
+export type SuggestionType =
+  // Generic types (work across all platforms)
+  | 'PRICE_CHANGE'
+  | 'ITEM_IMPROVEMENT'
+  | 'TEMPORARY_DISABLE'
+  | 'PROMOTION'
+  // PedidosYa-specific types
+  | 'PEDIDOS_YA_DESCUENTO_FUGAZ'
+  | 'PEDIDOS_YA_MENU_COMPLETO'
+  | 'PEDIDOS_YA_PRODUCTOS_DESTACADOS';
+
+export interface SuggestionTypeConfig {
+  value: SuggestionType;
+  label: string;
+  icon: any;
+  description: string;
+  platform?: DeliveryPlatform | null;  // null = works on all platforms
+}
+
 export interface PlatformIntegration {
   id: string;
   platform: DeliveryPlatform;
@@ -17,6 +36,13 @@ export interface StoreInfo {
   chainName: string;
   city: string | null;
   country: string | null;
+  platform?: DeliveryPlatform;
+  hasCustomConfig?: boolean; // Indicates if store has custom configuration
+  configSource?: ConfigSource; // 'store' if has custom config, 'user' if using default
+}
+
+export interface StoreWithPlatform extends StoreInfo {
+  platform?: DeliveryPlatform;
 }
 
 export interface DeliveryStatusResponse {
@@ -64,4 +90,96 @@ export interface SyncResponse {
     storesCreated: number;
     storesUpdated: number;
   }[];
+}
+
+// PedidosYa-specific action structures
+export interface PedidosYaFlashDiscountAction {
+  items: string[];
+  discount: {
+    type: 'PERCENTAGE' | 'FIXED';
+    value: number;
+  };
+  schedule: {
+    start: string;
+    end: string;
+  };
+  platformSpecific: {
+    pedidosYa: {
+      campaignType: 'flash';
+      minOrderValue?: number;
+      maxDiscountAmount?: number;
+    };
+  };
+}
+
+export interface PedidosYaMenuCompletoAction {
+  bundleItems: {
+    main: string[];
+    drink: string[];
+    side?: string[];
+  };
+  bundlePrice: number;
+  platformSpecific: {
+    pedidosYa: {
+      campaignType: 'bundle';
+      bundleName?: string;
+    };
+  };
+}
+
+export interface PedidosYaProductosDestacadosAction {
+  items: string[];
+  placement: 'HOMEPAGE_BANNER' | 'CATEGORY_TOP' | 'SEARCH_RESULTS';
+  priority?: number;
+  platformSpecific: {
+    pedidosYa: {
+      campaignType: 'featured';
+      bannerType?: string;
+      duration?: string;
+    };
+  };
+}
+
+//
+// Store Configuration Types
+//
+
+export type ConfigSource = 'store' | 'user';
+
+export interface StoreConfig {
+  platformCommission: number | null;
+  markupPercentage: number | null;
+  fixedMonthlyCosts: number | null;
+  packagingCost: number | null;
+  deliveryCost: number | null;
+}
+
+export interface StoreConfigWithSource {
+  config: StoreConfig;
+  source: ConfigSource;
+}
+
+export interface StoreConfigResponse {
+  config: StoreConfig;
+  source: ConfigSource;
+}
+
+export interface StoreConfigCreateRequest {
+  platformCommission?: number;
+  markupPercentage?: number;
+  fixedMonthlyCosts?: number;
+  packagingCost?: number;
+  deliveryCost?: number;
+}
+
+export interface StoreConfigUpdateRequest {
+  platformCommission?: number;
+  markupPercentage?: number;
+  fixedMonthlyCosts?: number;
+  packagingCost?: number;
+  deliveryCost?: number;
+}
+
+export interface StoreConfigResetRequest {
+  fields: (keyof StoreConfig)[];
 }

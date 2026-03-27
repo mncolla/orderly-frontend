@@ -69,7 +69,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.setItem('auth_user', JSON.stringify(data.user));
       setUser(data.user);
       setError(null);
-      navigate("/overview", { transition: true });
+      // Redirigir a /agency si es usuario de tipo agencia, sino a /overview
+      const redirectPath = data.user.role === 'AGENCY' ? '/agency' : '/overview';
+      navigate(redirectPath, { transition: true });
     },
     onError: (err: any) => {
       setError(err.message || 'Login failed');
@@ -84,7 +86,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.setItem('auth_user', JSON.stringify(data.user));
       setUser(data.user);
       setError(null);
-      navigate("/overview", { transition: true });
+      // Redirigir a /agency si es usuario de tipo agencia, sino a /overview
+      const redirectPath = data.user.role === 'AGENCY' ? '/agency' : '/overview';
+      navigate(redirectPath, { transition: true });
     },
     onError: (err: any) => {
       setError(err.message || 'Signup failed');

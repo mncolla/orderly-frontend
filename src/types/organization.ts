@@ -85,9 +85,19 @@ export interface Organization {
   };
 }
 
+export interface StoreConfigData {
+  storeId: string;
+  platformCommission?: number;
+  markupPercentage?: number;
+  fixedMonthlyCosts?: number;
+  packagingCost?: number;
+  deliveryCost?: number;
+}
+
 export interface OnboardingData {
   costs: OrganizationCosts;
   objectives: OrganizationObjective[];
+  storeConfigs?: StoreConfigData[];
 }
 
 // Objective labels for UI
