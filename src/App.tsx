@@ -14,6 +14,7 @@ import { SuggestionsPage } from './pages/SuggestionsPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { IntegrationsPage } from './pages/IntegrationsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { StoresPage } from './pages/StoresPage';
 import { AgencyPage } from './pages/AgencyPage';
 import { useEffect, useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
@@ -90,6 +91,15 @@ function App() {
             <OnboardingGuard>
               <DashboardLayout>
                 <MenuPage />
+              </DashboardLayout>
+            </OnboardingGuard>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/stores">
+          <ProtectedRoute>
+            <OnboardingGuard>
+              <DashboardLayout>
+                <StoresPage />
               </DashboardLayout>
             </OnboardingGuard>
           </ProtectedRoute>

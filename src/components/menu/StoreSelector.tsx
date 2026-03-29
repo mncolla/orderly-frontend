@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
@@ -49,6 +48,7 @@ export function StoreSelector({
 }: StoreSelectorProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [tempSelectedStoreIds, setTempSelectedStoreIds] = useState<string[]>(selectedStoreIds);
 
   const groupedStores = useMemo(() => {
     const groups = new Map<string, Map<string, StoreWithPlatform[]>>();
@@ -106,33 +106,46 @@ export function StoreSelector({
 
   const handleToggleStore = (storeId: string) => {
     if (mode === 'single') {
-      onSelectionChange([storeId]);
+      setTempSelectedStoreIds([storeId]);
       return;
     }
 
-    if (selectedStoreIds.includes(storeId)) {
-      onSelectionChange(selectedStoreIds.filter((id) => id !== storeId));
+    if (tempSelectedStoreIds.includes(storeId)) {
+      setTempSelectedStoreIds(tempSelectedStoreIds.filter((id) => id !== storeId));
     } else {
-      onSelectionChange([...selectedStoreIds, storeId]);
+      setTempSelectedStoreIds([...tempSelectedStoreIds, storeId]);
     }
   };
 
   const handleSelectAll = () => {
-    if (selectedStoreIds.length === filteredStores.length) {
-      onSelectionChange([]);
+    if (tempSelectedStoreIds.length === filteredStores.length) {
+      setTempSelectedStoreIds([]);
     } else {
-      onSelectionChange(filteredStores.map((s) => s.id));
+      setTempSelectedStoreIds(filteredStores.map((s) => s.id));
     }
   };
 
   const handleClearAll = () => {
-    onSelectionChange([]);
+    setTempSelectedStoreIds([]);
   };
 
-  const isAllSelected = filteredStores.length > 0 && selectedStoreIds.length === filteredStores.length;
+  const handleApply = () => {
+    onSelectionChange(tempSelectedStoreIds);
+    setOpen(false);
+  };
+
+  const isAllSelected = filteredStores.length > 0 && tempSelectedStoreIds.length === filteredStores.length;
+
+  // Sincronizar tempSelectedStoreIds con selectedStoreIds cuando se abre el drawer
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (newOpen) {
+      setTempSelectedStoreIds(selectedStoreIds);
+    }
+  };
 
   return (
-    <Drawer open={open} onOpenChange={setOpen} direction="right">
+    <Drawer open={open} onOpenChange={handleOpenChange} direction="right">
       <DrawerTrigger asChild>
         <Button
           variant="outline"
@@ -162,7 +175,7 @@ export function StoreSelector({
               </DrawerTitle>
             </div>
             <div className="flex gap-2">
-              {selectedStoreIds.length > 0 && (
+              {tempSelectedStoreIds.length > 0 && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -181,9 +194,9 @@ export function StoreSelector({
           </div>
         </DrawerHeader>
 
-        <div className="flex flex-col h-full">
-          {/* Search */}
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+          {/* Search - Fixed at top */}
+          <div className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -208,9 +221,9 @@ export function StoreSelector({
             )}
           </div>
 
-          {/* Store List */}
-          <ScrollArea className="flex-1 px-4">
-            <RadioGroup value={selectedStoreIds[0] || ''} onValueChange={handleToggleStore}>
+          {/* Store List - Scrollable */}
+          <div className="flex-1 overflow-y-auto px-4">
+            <RadioGroup value={tempSelectedStoreIds[0] || ''} onValueChange={handleToggleStore}>
               <div className="py-4 space-y-4">
                 {Array.from(filteredGroupedStores.entries()).map(([platform, chainGroups]) => (
                   <div key={platform} className="space-y-3">
@@ -234,7 +247,7 @@ export function StoreSelector({
                         )}
                         <div className="space-y-1">
                           {chainStores.map((store) => {
-                            const isSelected = selectedStoreIds.includes(store.id);
+                            const isSelected = tempSelectedStoreIds.includes(store.id);
 
                             return (
                               <div
@@ -305,15 +318,16 @@ export function StoreSelector({
                 )}
               </div>
             </RadioGroup>
-          </ScrollArea>
+          </div>
 
-          {/* Footer */}
-          <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800">
-            <DrawerClose asChild>
-              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 font-medium">
-                Aplicar {selectedStoreIds.length > 0 && `(${selectedStoreIds.length} local${selectedStoreIds.length > 1 ? 'es' : ''})`}
-              </Button>
-            </DrawerClose>
+          {/* Footer - Fixed at bottom */}
+          <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800">
+            <Button
+              onClick={handleApply}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 font-medium"
+            >
+              Aplicar {tempSelectedStoreIds.length > 0 && `(${tempSelectedStoreIds.length} local${tempSelectedStoreIds.length > 1 ? 'es' : ''})`}
+            </Button>
           </div>
         </div>
       </DrawerContent>

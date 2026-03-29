@@ -28,6 +28,7 @@ export interface Store {
   chainName: string;
   city: string | null;
   country: string | null;
+  platform?: string;
   storeItems: StoreItem[];
   storeCategories: Array<{
     id: string;

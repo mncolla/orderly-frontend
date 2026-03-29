@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, ShoppingCart, Clock, AlertTriangle, ArrowUpRight, ArrowDownRight, Target, Calendar } from 'lucide-react';
+import { DollarSign, ShoppingCart, Clock, AlertTriangle, ArrowUpRight, ArrowDownRight, Target } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOverview } from '../hooks/useOverview';
 import { ChartLineMultiple } from '@/components/ChartLineMultiple';
@@ -9,12 +9,16 @@ import { DatePickerWithRange } from '@/components/DatePIckerWIthRange';
 import { type DateRange } from 'react-day-picker';
 import { platformIntegrationsService } from '../services/platformIntegrationsService';
 import { AgencyContextBanner } from '@/components/AgencyContextBanner';
+import { StoreSelector, type StoreWithPlatform } from '@/components/menu/StoreSelector';
+import { api } from '../services/api';
 
 export function OverviewPage() {
   const { user } = useAuth();
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [userHasChangedDates, setUserHasChangedDates] = useState(false);
   const [objectives, setObjectives] = useState<any[]>([]);
+  const [stores, setStores] = useState<StoreWithPlatform[]>([]);
+  const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
 
   // Parse search params from window.location
   const searchParams = new URLSearchParams(window.location.search);
@@ -63,12 +67,14 @@ export function OverviewPage() {
   const { data: overview, isLoading, error } = useOverview(
     userHasChangedDates && dateRange
       ? {
-          storeId: agencyStoreId || undefined,
+          storeId: (selectedStoreIds.length === 0 && agencyStoreId) ? agencyStoreId : undefined,
+          storeIds: selectedStoreIds.length > 0 ? selectedStoreIds : undefined,
           startDate: dateRange.from?.toISOString(),
           endDate: dateRange.to?.toISOString(),
         }
       : {
-          storeId: agencyStoreId || undefined,
+          storeId: (selectedStoreIds.length === 0 && agencyStoreId) ? agencyStoreId : undefined,
+          storeIds: selectedStoreIds.length > 0 ? selectedStoreIds : undefined,
         }
   );
 
@@ -80,6 +86,59 @@ export function OverviewPage() {
       });
     }
   }, [user]);
+
+  // Load stores for the store selector
+  useEffect(() => {
+    const loadStores = async () => {
+      try {
+        if (agencyView && agencyUserId) {
+          // Agency mode: load stores for the specific user
+          const response = await api.get(`/platform-integrations?userId=${agencyUserId}`);
+          const data = response as { integrations: any[] };
+
+          const allStores: StoreWithPlatform[] = [];
+          data.integrations?.forEach((integration: any) => {
+            integration.stores?.forEach((store: any) => {
+              allStores.push({
+                id: store.id,
+                name: store.name,
+                chainName: store.chainName,
+                platform: integration.platform,
+              });
+            });
+          });
+
+          setStores(allStores);
+
+          // Pre-select the specific store if provided
+          if (agencyStoreId) {
+            setSelectedStoreIds([agencyStoreId]);
+          }
+        } else if (user?.integrations) {
+          // Owner mode: load all user's stores
+          const allStores: StoreWithPlatform[] = [];
+          for (const integration of user.integrations) {
+            const integrationData = await platformIntegrationsService.getById(integration.id);
+            if (integrationData?.integration?.stores) {
+              integrationData.integration.stores.forEach((store: any) => {
+                allStores.push({
+                  id: store.id,
+                  name: store.name,
+                  chainName: store.chainName,
+                  platform: integration.platform,
+                });
+              });
+            }
+          }
+          setStores(allStores);
+        }
+      } catch (error) {
+        console.error('Error loading stores:', error);
+      }
+    };
+
+    loadStores();
+  }, [user, agencyView, agencyUserId, agencyStoreId]);
 
   useEffect(() => {
     if (overview?.period && !userHasChangedDates) {
@@ -200,23 +259,21 @@ export function OverviewPage() {
                 }
               </p>
             </div>
-            <DatePickerWithRange
-              value={dateRange}
-              onChange={handleDateChange}
-            />
-          </div>
-
-          {/* Period Badge */}
-          {overview?.period && (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 rounded-full border border-blue-200 dark:border-blue-800">
-              <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                {new Date(overview.period.start).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
-                {' - '}
-                {new Date(overview.period.end).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </span>
+            <div className="flex items-center gap-3">
+              {!agencyView && (
+                <StoreSelector
+                  stores={stores}
+                  selectedStoreIds={selectedStoreIds}
+                  onSelectionChange={setSelectedStoreIds}
+                  mode="multi"
+                />
+              )}
+              <DatePickerWithRange
+                value={dateRange}
+                onChange={handleDateChange}
+              />
             </div>
-          )}
+          </div>
         </div>
 
         {/* KPIs Grid */}

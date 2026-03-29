@@ -12,6 +12,7 @@ export const operationsService = {
    * Query params:
    * - organizationId: Filter by organization
    * - storeId: Filter by store
+   * - storeIds: Filter by multiple stores (comma-separated)
    * - platform: Filter by platform (PEDIDOS_YA, RAPPI, etc.)
    * - period: Preset (today, last7days, thisMonth)
    * - startDate: Start date override (has precedence over period)
@@ -26,6 +27,7 @@ export const operationsService = {
   getOperations: async (params?: {
     organizationId?: string;
     storeId?: string;
+    storeIds?: string[];
     platform?: string;
     period?: OperationsPeriod;
     startDate?: string;
@@ -34,6 +36,7 @@ export const operationsService = {
     const queryParams = new URLSearchParams();
     if (params?.organizationId) queryParams.set('organizationId', params.organizationId);
     if (params?.storeId) queryParams.set('storeId', params.storeId);
+    if (params?.storeIds && params.storeIds.length > 0) queryParams.set('storeIds', params.storeIds.join(','));
     if (params?.platform) queryParams.set('platform', params.platform);
 
     // Period presets (si no hay override con fechas específicas)

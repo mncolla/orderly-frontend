@@ -5,10 +5,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DatePickerWithRange } from '@/components/DatePIckerWIthRange';
 import { type DateRange } from 'react-day-picker';
 import { AgencyContextBanner } from '@/components/AgencyContextBanner';
+import { StoreSelector, type StoreWithPlatform } from '@/components/menu/StoreSelector';
+import { api } from '../services/api';
+import { platformIntegrationsService } from '../services/platformIntegrationsService';
+import { useAuth } from '../contexts/AuthContext';
 
 export function OperationsPage() {
+  const { user } = useAuth();
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [userHasChangedDates, setUserHasChangedDates] = useState(false);
+  const [stores, setStores] = useState<StoreWithPlatform[]>([]);
+  const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
 
   const searchParams = new URLSearchParams(window.location.search);
   const agencyView = searchParams.get('agencyView') === 'true';
@@ -52,15 +59,70 @@ export function OperationsPage() {
     }
   }, [agencyView, agencyUserId, agencyStoreId]);
 
+  // Load stores for the store selector
+  useEffect(() => {
+    const loadStores = async () => {
+      try {
+        if (agencyView && agencyUserId) {
+          // Agency mode: load stores for the specific user
+          const response = await api.get(`/platform-integrations?userId=${agencyUserId}`);
+          const data = response as { integrations: any[] };
+
+          const allStores: StoreWithPlatform[] = [];
+          data.integrations?.forEach((integration: any) => {
+            integration.stores?.forEach((store: any) => {
+              allStores.push({
+                id: store.id,
+                name: store.name,
+                chainName: store.chainName,
+                platform: integration.platform,
+              });
+            });
+          });
+
+          setStores(allStores);
+
+          // Pre-select the specific store if provided
+          if (agencyStoreId) {
+            setSelectedStoreIds([agencyStoreId]);
+          }
+        } else if (user?.integrations) {
+          // Owner mode: load all user's stores
+          const allStores: StoreWithPlatform[] = [];
+          for (const integration of user.integrations) {
+            const integrationData = await platformIntegrationsService.getById(integration.id);
+            if (integrationData?.integration?.stores) {
+              integrationData.integration.stores.forEach((store: any) => {
+                allStores.push({
+                  id: store.id,
+                  name: store.name,
+                  chainName: store.chainName,
+                  platform: integration.platform,
+                });
+              });
+            }
+          }
+          setStores(allStores);
+        }
+      } catch (error) {
+        console.error('Error loading stores:', error);
+      }
+    };
+
+    loadStores();
+  }, [user, agencyView, agencyUserId, agencyStoreId]);
+
   const { data: operations, isLoading, error } = useOperations(
     userHasChangedDates && dateRange
       ? {
-          storeId: agencyStoreId || undefined,
+          storeId: (selectedStoreIds.length === 0 && agencyStoreId) ? agencyStoreId : undefined,
+          storeIds: selectedStoreIds.length > 0 ? selectedStoreIds : undefined,
           startDate: dateRange.from?.toISOString(),
           endDate: dateRange.to?.toISOString(),
         }
       : {
-          storeId: agencyStoreId || undefined,
+          storeId: (selectedStoreIds.length === 0 && agencyStoreId) ? agencyStoreId : undefined,
+          storeIds: selectedStoreIds.length > 0 ? selectedStoreIds : undefined,
           period: 'last7days',
         }
   );
@@ -188,10 +250,20 @@ export function OperationsPage() {
                 }
               </p>
             </div>
-            <DatePickerWithRange
-              value={dateRange}
-              onChange={handleDateChange}
-            />
+            <div className="flex items-center gap-3">
+              {!agencyView && (
+                <StoreSelector
+                  stores={stores}
+                  selectedStoreIds={selectedStoreIds}
+                  onSelectionChange={setSelectedStoreIds}
+                  mode="multi"
+                />
+              )}
+              <DatePickerWithRange
+                value={dateRange}
+                onChange={handleDateChange}
+              />
+            </div>
           </div>
         </div>
 

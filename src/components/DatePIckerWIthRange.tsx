@@ -3,7 +3,6 @@
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
-import { Field } from "@/components/ui/field"
 import {
   Popover,
   PopoverContent,
@@ -12,6 +11,7 @@ import {
 import { format } from "date-fns"
 import { CalendarIcon } from "lucide-react"
 import { type DateRange } from "react-day-picker"
+import { useTranslation } from "react-i18next"
 
 export interface DatePickerWithRangeProps {
   value?: DateRange
@@ -19,6 +19,7 @@ export interface DatePickerWithRangeProps {
 }
 
 export function DatePickerWithRange({ value, onChange }: DatePickerWithRangeProps) {
+  const { t } = useTranslation()
   const [internalRange, setInternalRange] = React.useState<DateRange | undefined>(value)
   const [isOpen, setIsOpen] = React.useState(false)
   const [originalRange, setOriginalRange] = React.useState<DateRange | undefined>(value)
@@ -52,29 +53,35 @@ export function DatePickerWithRange({ value, onChange }: DatePickerWithRangeProp
   }
 
   const date = value ?? internalRange
+  const hasDate = date?.from
 
   return (
-    <Field className="w-60">
-      {/* <FieldLabel htmlFor="date-picker-range">Date Picker Range</FieldLabel> */}
+    <div className="w-auto">
       <Popover open={isOpen} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <Button
-            variant="outline"
+            variant={hasDate ? "default" : "outline"}
             id="date-picker-range"
-            className="justify-start px-2.5 font-normal"
+            className={`
+              justify-start px-3 py-2 font-normal transition-all duration-200
+              ${hasDate
+                ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 border-blue-600'
+                : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+              }
+            `}
           >
-            <CalendarIcon />
+            <CalendarIcon className={hasDate ? "text-white" : "text-gray-600 dark:text-gray-400"} />
             {date?.from ? (
               date.to ? (
                 <>
-                  {format(date.from, "LLL dd, y")} -{" "}
-                  {format(date.to, "LLL dd, y")}
+                  {format(date.from, "MMM dd, y")} -{" "}
+                  {format(date.to, "MMM dd, y")}
                 </>
               ) : (
-                format(date.from, "LLL dd, y")
+                format(date.from, "MMM dd, y")
               )
             ) : (
-              <span>Pick a date</span>
+              <span className="text-gray-600 dark:text-gray-400">{t('datePicker.selectDateRange')}</span>
             )}
           </Button>
         </PopoverTrigger>
@@ -94,7 +101,7 @@ export function DatePickerWithRange({ value, onChange }: DatePickerWithRangeProp
               className="flex-1"
               onClick={handleClear}
             >
-              Limpiar
+              {t('datePicker.clear')}
             </Button>
             <Button
               size="sm"
@@ -102,11 +109,11 @@ export function DatePickerWithRange({ value, onChange }: DatePickerWithRangeProp
               onClick={handleApply}
               disabled={!internalRange?.from || !internalRange?.to}
             >
-              Aplicar
+              {t('datePicker.apply')}
             </Button>
           </div>
         </PopoverContent>
       </Popover>
-    </Field>
+    </div>
   )
 }
