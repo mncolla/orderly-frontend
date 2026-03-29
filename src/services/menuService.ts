@@ -15,6 +15,7 @@ export interface MenuItem {
   storeCount: number;
   minPrice: number;
   maxPrice: number;
+  itemOptionIds?: string[];  // IDs de las opciones que tiene este item
 }
 
 export interface CategoryStat {
