@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { ChevronRight, ChevronLeft, Check, Store, Loader2, TrendingUp, UtensilsCrossed, ShoppingCart, Home, Settings, Target, BarChart3 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { platformIntegrationsService, type SyncProgress } from '../services/platformIntegrationsService';
+import { useSyncContext } from '../contexts/SyncContext';
 import { useConnectPedidosYa } from '../hooks/useIntegrations';
+import { useSyncProgress } from '../hooks/useSyncProgress';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,54 +47,31 @@ export function OnboardingWizard() {
   const [needsOTP, setNeedsOTP] = useState(false);
   const [connectionError, setConnectionError] = useState('');
 
-  // Sync states
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStarted, setSyncStarted] = useState(false);
-  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
-  const [syncError, setSyncError] = useState('');
+  // Sync states - now using hook
+  const { isSyncing, syncProgress, startSync: handleStartSync } = useSyncProgress(selectedPlatform, {
+    onSyncComplete: () => {
+      setTimeout(() => {
+        setCurrentStep('defaultConfig');
+      }, 1000);
+    },
+    onSyncError: (error) => {
+      setConnectionError(error);
+    },
+    showToast: true,
+  });
+
+  // Global sync state - to disable "Conectar cuenta" button during ANY sync
+  const { isSyncing: isAnySyncInProgress } = useSyncContext();
 
   // Mutation for platform connection
   const connectMutation = useConnectPedidosYa();
 
-  // Polling effect for sync progress
-  useEffect(() => {
-    if (!syncStarted || !isSyncing) return;
-
-    const pollInterval = setInterval(async () => {
-      try {
-        const result = await platformIntegrationsService.getSyncProgress(selectedPlatform);
-
-        if (result.status === 'no_sync_in_progress') {
-          setIsSyncing(false);
-          return;
-        }
-
-        if (result.progress) {
-          setSyncProgress(result.progress);
-
-          const allCompleted = result.progress.steps.every(step => step.status === 'completed');
-          if (allCompleted) {
-            setIsSyncing(false);
-            setSyncStarted(false);
-            setTimeout(() => {
-              setCurrentStep('defaultConfig');
-            }, 1000);
-          }
-        }
-      } catch (error: any) {
-        console.error('Error polling sync progress:', error);
-      }
-    }, 2000);
-
-    return () => clearInterval(pollInterval);
-  }, [syncStarted, isSyncing, selectedPlatform]);
-
   // Auto-start sync when connection is successful
   useEffect(() => {
-    if (createdIntegration && !syncStarted) {
+    if (createdIntegration && !isSyncing) {
       handleStartSync();
     }
-  }, [createdIntegration]);
+  }, [createdIntegration, isSyncing, handleStartSync]);
 
   // Default configuration (Step 2)
   const [defaultConfig, setDefaultConfig] = useState({
@@ -170,20 +148,6 @@ export function OnboardingWizard() {
       setConnectionError(error.message || 'Error al verificar el código');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleStartSync = async () => {
-    try {
-      setIsSyncing(true);
-      setSyncStarted(true);
-      setSyncError('');
-
-      await platformIntegrationsService.startSegmentedSync(selectedPlatform);
-    } catch (error: any) {
-      setSyncError(error.message || 'Error al iniciar la sincronización');
-      setIsSyncing(false);
-      setSyncStarted(false);
     }
   };
 
@@ -400,13 +364,18 @@ export function OnboardingWizard() {
 
                   <Button
                     type="submit"
-                    disabled={isLoading || connectMutation.isPending}
-                    className="w-full h-10 sm:h-11 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30"
+                    disabled={isLoading || connectMutation.isPending || isAnySyncInProgress}
+                    className="w-full h-10 sm:h-11 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 !disabled:opacity-50 !disabled:cursor-not-allowed"
                   >
                     {isLoading || connectMutation.isPending ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Conectando...
+                      </>
+                    ) : isAnySyncInProgress ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sincronizando...
                       </>
                     ) : (
                       'Conectar cuenta'
@@ -443,13 +412,18 @@ export function OnboardingWizard() {
 
                   <Button
                     type="submit"
-                    disabled={connectMutation.isPending || otpCode.length !== 6}
+                    disabled={connectMutation.isPending || otpCode.length !== 6 || isAnySyncInProgress}
                     className="w-full h-10 sm:h-11 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30"
                   >
                     {connectMutation.isPending ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Verificando...
+                      </>
+                    ) : isAnySyncInProgress ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sincronizando...
                       </>
                     ) : (
                       'Verificar'
@@ -525,12 +499,6 @@ export function OnboardingWizard() {
                       </Card>
                     );
                   })}
-                </div>
-              )}
-
-              {syncError && (
-                <div className="p-3 sm:p-4 text-sm text-red-800 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-800">
-                  {syncError}
                 </div>
               )}
 

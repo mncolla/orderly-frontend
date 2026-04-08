@@ -6,7 +6,7 @@ export interface ItemOptionValue {
   optionId: string;
   name: string;
   position: number;
-  unitPrice: number;
+  unitPrice: string; // Viene como string desde Prisma Decimal
   available: boolean;
   availabilityStatus?: string;
   createdAt: string;

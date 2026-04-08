@@ -182,9 +182,9 @@ function OptionCard({ option, isExpanded, onToggle }: OptionCardProps) {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {value.unitPrice > 0 && (
+                  {Number(value.unitPrice) > 0 && (
                     <span className="font-semibold text-gray-900 dark:text-white">
-                      ${value.unitPrice.toFixed(2)}
+                      ${Number(value.unitPrice).toFixed(2)}
                     </span>
                   )}
                   {!value.available && (

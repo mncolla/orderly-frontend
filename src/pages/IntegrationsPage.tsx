@@ -7,6 +7,7 @@ import { SyncProgressDisplay } from '../components/SyncProgress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import type { DeliveryPlatform } from '../types/integrations';
+import { useSyncContext } from '../contexts/SyncContext';
 
 const platformNames: Record<DeliveryPlatform, string> = {
   PEDIDOS_YA: 'PedidosYa',
@@ -19,6 +20,9 @@ export function IntegrationsPage() {
   const { user, refetchUser } = useAuth();
   const connectMutation = useConnectPedidosYa();
   const disconnectMutation = useDisconnect();
+
+  // Use global sync context
+  const { isSyncing: isAnySyncInProgress } = useSyncContext();
 
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [showOTPModal, setShowOTPModal] = useState(false);
@@ -108,6 +112,12 @@ export function IntegrationsPage() {
   };
 
   const handleStartSync = async (platform: DeliveryPlatform) => {
+    // PROTECCIÓN: Si ya estamos sincronizando esta plataforma, ignorar
+    if (isSyncing && syncingPlatform === platform) {
+      console.log(`⚠️ Sync already in progress for ${platform}, ignoring click`);
+      return;
+    }
+
     setSyncError('');
     setSyncingPlatform(platform);
     setIsSyncing(true);
@@ -216,9 +226,10 @@ export function IntegrationsPage() {
                         platform === 'PEDIDOS_YA' && (
                           <button
                             onClick={() => setShowConnectModal(true)}
-                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                            disabled={isAnySyncInProgress}
+                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Conectar
+                            {isAnySyncInProgress ? 'Sincronizando...' : 'Conectar'}
                           </button>
                         )
                       )}

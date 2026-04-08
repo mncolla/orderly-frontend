@@ -7,6 +7,7 @@ import { OnboardingWizard } from './components/OnboardingWizard';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import DebugPage from './pages/DebugPage';
+import UserDebugPage from './pages/UserDebugPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { OperationsPage } from './pages/OperationsPage';
 import { MenuPage } from './pages/MenuPage';
@@ -51,8 +52,9 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        {/* Debug route - SIN AUTENTICACIÓN - Solo desarrollo */}
+        {/* Debug routes - SIN AUTENTICACIÓN - Solo desarrollo */}
         <Route path="/debug" component={DebugPage} />
+        <Route path="/user-debug" component={UserDebugPage} />
 
         <Route path="/login" component={LoginPage} />
         <Route path="/signup" component={SignupPage} />
