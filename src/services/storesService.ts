@@ -19,7 +19,35 @@ export interface StoreItem {
     description: string | null;
     imageUrl: string | null;
     categoryId: string;
+    category?: {
+      id: string;
+      name: string;
+    };
   };
+}
+
+export interface ItemOptionValue {
+  id: string;
+  externalId: string;
+  optionId: string;
+  name: string;
+  position: number;
+  unitPrice: number;
+  available: boolean;
+  availabilityStatus?: string;
+}
+
+export interface ItemOption {
+  id: string;
+  externalId: string;
+  storeId: string;
+  name: string;
+  type: 'CHOICES' | 'BUNDLE_SECTION';
+  position: number;
+  minQuantity: number;
+  maxQuantity: number | null;
+  lastSyncAt: string | null;
+  values: ItemOptionValue[];
 }
 
 export interface Store {
@@ -68,6 +96,15 @@ export const storesService = {
   getById: async (storeId: string): Promise<{ store: Store }> => {
     const response = await api.get(`/stores/${storeId}`);
     return response as { store: Store };
+  },
+
+  /**
+   * GET /api/stores/:storeId/options
+   * Obtener todas las opciones de items de una tienda
+   */
+  getOptions: async (storeId: string): Promise<{ storeId: string; options: ItemOption[]; count: number }> => {
+    const response = await api.get(`/stores/${storeId}/options`);
+    return response as { storeId: string; options: ItemOption[]; count: number };
   },
 
   // Store Configuration Methods

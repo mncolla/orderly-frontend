@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { OnboardingGuard } from './components/OnboardingGuard';
 import { Sidebar } from './components/Sidebar';
 import { OnboardingWizard } from './components/OnboardingWizard';
+import { SyncBanner } from './components/SyncBanner';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import DebugPage from './pages/DebugPage';
@@ -38,6 +39,9 @@ function RoleBasedRedirect() {
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      {/* Banner persistente de sincronización */}
+      <SyncBanner />
+
       <Sidebar />
       <main className="lg:ml-64 min-h-screen">
         <div className="pt-16 lg:pt-0">

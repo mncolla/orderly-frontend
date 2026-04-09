@@ -1,0 +1,126 @@
+import { useSyncContext } from '@/contexts/SyncContext';
+import { Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { useMemo } from 'react';
+
+/**
+ * SyncBanner - Banner persistente que muestra el estado de sincronización
+ *
+ * Características:
+ * - Aparece en TODAS las páginas cuando hay una sincronización activa
+ * - NO se puede cerrar manualmente (persistente)
+ * - Indica claramente que los datos pueden no estar actualizados
+ * - Muestra progreso en tiempo real
+ *
+ * Este banner reemplaza al toast volátil para dar feedback persistente
+ * durante sincronizaciones largas (especialmente orders sync que puede tardar horas)
+ */
+export function SyncBanner() {
+  const { activeSyncs, isSyncing } = useSyncContext();
+
+  // Si no hay sincronizaciones activas, no mostrar nada
+  if (!isSyncing || activeSyncs.size === 0) {
+    return null;
+  }
+
+  // Obtener la primera sincronización activa (generalmente solo hay una a la vez)
+  const firstSync = Array.from(activeSyncs.values())[0];
+
+  if (!firstSync) {
+    return null;
+  }
+
+  // Calcular progreso total
+  const totalProgress = useMemo(() => {
+    const totalSteps = firstSync.steps.length;
+    const completedSteps = firstSync.steps.filter(s => s.status === 'completed').length;
+    return Math.round((completedSteps / totalSteps) * 100);
+  }, [firstSync.steps]);
+
+  // Obtener el paso actual en progreso
+  const currentStep = firstSync.steps.find(s => s.status === 'in_progress');
+
+  // Obtener el step name y descripción en español
+  const getStepInfo = (step: string, progress: number, total: number) => {
+    switch (step) {
+      case 'stores':
+        return {
+          name: 'Locales',
+          description: `${progress} de ${total} locales encontrados`
+        };
+      case 'menu':
+        return {
+          name: 'Menú',
+          description: `${progress} de ${total} grupos sincronizados`
+        };
+      case 'orders':
+        return {
+          name: 'Órdenes',
+          description: `${progress} de ${total} stores procesados`
+        };
+      default:
+        return {
+          name: step,
+          description: `${progress}/${total}`
+        };
+    }
+  };
+
+  const stepInfo = currentStep ? getStepInfo(currentStep.step, currentStep.progress, currentStep.total) : { name: 'Procesando...', description: '0/0' };
+
+  // Color de fondo según estado
+  const getBannerColor = () => {
+    if (currentStep?.step === 'orders') {
+      // Orders sync es muy largo, usar color advertencia
+      return 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800';
+    }
+    // Otros pasos usan color info
+    return 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800';
+  };
+
+  return (
+    <div className={`border-b ${getBannerColor()} shadow-lg`}>
+      <div className="px-4 py-3 lg:px-6 lg:ml-64">
+        <div className="flex items-center justify-between gap-4">
+          {/* Icono y mensaje principal */}
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {currentStep?.step === 'orders' ? (
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 animate-pulse" />
+            ) : (
+              <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 animate-spin" />
+            )}
+
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-gray-900 dark:text-white">
+                {currentStep?.step === 'orders' ? 'Sincronización Extendida en Progreso' : 'Sincronizando...'}
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                {stepInfo.name}: {stepInfo.description} ({totalProgress}%)
+              </p>
+            </div>
+          </div>
+
+          {/* Advertencia sobre datos */}
+          <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+            <div className="text-right">
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                ⚠️ Los datos pueden no estar actualizados
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                Esta sincronización puede tardar varios minutos
+              </p>
+            </div>
+            <RefreshCw className="h-4 w-4 text-gray-500 dark:text-gray-400 animate-spin" />
+          </div>
+        </div>
+
+        {/* Barra de progreso */}
+        <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 transition-all duration-300 ease-out"
+            style={{ width: `${totalProgress}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

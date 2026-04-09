@@ -60,7 +60,9 @@ export function SyncProgressDisplay({ syncProgress, syncError }: SyncProgressDis
                          'Órdenes'}
                       </span>
                       <span className="text-xs text-gray-600 dark:text-gray-400">
-                        {step.progress}/{step.total}
+                        {step.step === 'stores' ? `${step.progress} de ${step.total} locales` :
+                         step.step === 'menu' ? `${step.progress} de ${step.total} grupos` :
+                         `${step.progress} de ${step.total} stores`}
                       </span>
                     </div>
 

@@ -1,5 +1,5 @@
-export type SuggestionType = 'ITEM_OPTIMIZATION' | 'MENU_ACTIVATION' | 'PRICE_ADJUSTMENT' | 'PROMOTION';
-export type SuggestionStatus = 'PENDING' | 'ACCEPTED' | 'COMPLETED' | 'REJECTED';
+export type SuggestionType = 'ITEM_IMPROVEMENT' | 'PEDIDOS_YA_DESCUENTO_FUGAZ' | 'PEDIDOS_YA_MENU_COMPLETO' | 'PEDIDOS_YA_PRODUCTOS_DESTACADOS' | 'ITEM_OPTIMIZATION' | 'MENU_ACTIVATION' | 'PRICE_ADJUSTMENT' | 'PROMOTION';
+export type SuggestionStatus = 'PENDING' | 'ACCEPTED' | 'APPLIED' | 'REJECTED';
 
 export interface MetricSnapshot {
   totalSales: number;
@@ -39,6 +39,7 @@ export interface Suggestion {
   status: SuggestionStatus;
   title: string;
   description: string;
+  action?: any; // JSON flexible con la acción a ejecutar
   metricsBefore?: MetricSnapshot;
   metricsAfter?: MetricSnapshot;
   items: SuggestionItem[];
@@ -49,7 +50,11 @@ export interface Suggestion {
   potentialImpact?: string;
   createdAt: Date;
   updatedAt: Date;
-  organizationId: string;
+  appliedAt?: Date;
+  ownerId?: string;
+  storeId?: string;
+  platform?: string;
+  organizationId?: string;
   organization?: {
     id: string;
     name: string;

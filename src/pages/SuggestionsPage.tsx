@@ -11,7 +11,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 const statusConfig: Record<string, { color: string; label: string; icon: any }> = {
   PENDING: { color: 'yellow', label: 'Pendiente', icon: Clock },
   ACCEPTED: { color: 'blue', label: 'En Progreso', icon: TrendingUp },
-  COMPLETED: { color: 'green', label: 'Completada', icon: CheckCircle2 },
+  APPLIED: { color: 'green', label: 'Aplicada', icon: CheckCircle2 },
   REJECTED: { color: 'red', label: 'Rechazada', icon: XCircle },
 };
 
@@ -196,7 +196,7 @@ export function SuggestionsPage() {
       {/* Filter Tabs */}
       <div className="mb-6 overflow-x-auto">
         <div className="inline-flex gap-2 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
-          {['ALL', 'PENDING', 'ACCEPTED', 'COMPLETED', 'REJECTED'].map((status) => (
+          {['ALL', 'PENDING', 'ACCEPTED', 'APPLIED', 'REJECTED'].map((status) => (
             <button
               key={status}
               onClick={() => setFilter(status)}
@@ -244,13 +244,13 @@ export function SuggestionsPage() {
                         <div className={`p-2 rounded-lg ${
                           suggestion.status === 'PENDING' ? 'bg-yellow-100 dark:bg-yellow-900/30' :
                           suggestion.status === 'ACCEPTED' ? 'bg-blue-100 dark:bg-blue-900/30' :
-                          suggestion.status === 'COMPLETED' ? 'bg-green-100 dark:bg-green-900/30' :
+                          suggestion.status === 'APPLIED' ? 'bg-green-100 dark:bg-green-900/30' :
                           'bg-red-100 dark:bg-red-900/30'
                         }`}>
                           <StatusIcon className={`h-5 w-5 ${
                             suggestion.status === 'PENDING' ? 'text-yellow-600 dark:text-yellow-400' :
                             suggestion.status === 'ACCEPTED' ? 'text-blue-600 dark:text-blue-400' :
-                            suggestion.status === 'COMPLETED' ? 'text-green-600 dark:text-green-400' :
+                            suggestion.status === 'APPLIED' ? 'text-green-600 dark:text-green-400' :
                             'text-red-600 dark:text-red-400'
                           }`} />
                         </div>
@@ -266,6 +266,152 @@ export function SuggestionsPage() {
                       </p>
                     </div>
                   </div>
+
+                  {/* ITEM_IMPROVEMENT: Before/After Comparison */}
+                  {suggestion.type === 'ITEM_IMPROVEMENT' && suggestion.action && (
+                    <div className="mb-4 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        <p className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">
+                          Cambios Propuestos
+                        </p>
+                      </div>
+
+                      {/* Calcular si hay cambios reales */}
+                      {(() => {
+                        const hasPriceChange = suggestion.action.proposedPrice && suggestion.action.proposedPrice !== suggestion.action.currentPrice;
+                        const hasDescriptionChange = suggestion.action.proposedDescription && suggestion.action.proposedDescription !== suggestion.action.currentDescription;
+                        const hasImageChange = suggestion.action.proposedImageUrl && suggestion.action.proposedImageUrl !== suggestion.action.currentImageUrl;
+                        const hasAnyChanges = hasPriceChange || hasDescriptionChange || hasImageChange;
+
+                        // Si no hay cambios, mostrar mensaje
+                        if (!hasAnyChanges) {
+                          return (
+                            <div className="text-center py-4">
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                No se detectaron cambios en esta sugerencia
+                              </p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Antes */}
+                            <div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-full">
+                                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">ANTES</span>
+                                </div>
+                              </div>
+
+                              {/* Imagen actual */}
+                              {suggestion.action.currentImageUrl && (
+                                <div className="mb-3">
+                                  <img
+                                    src={suggestion.action.currentImageUrl}
+                                    alt="Imagen actual"
+                                    className="w-full h-32 object-cover rounded-lg border border-gray-200 dark:border-gray-600"
+                                  />
+                                </div>
+                              )}
+
+                              <div className="space-y-2 text-sm">
+                                <div>
+                                  <span className="text-gray-600 dark:text-gray-400">Producto:</span>
+                                  <p className="font-medium text-gray-900 dark:text-white mt-1">
+                                    {suggestion.action.itemName}
+                                  </p>
+                                </div>
+
+                                {/* Solo mostrar precio si va a cambiar */}
+                                {hasPriceChange && (
+                                  <div>
+                                    <span className="text-gray-600 dark:text-gray-400">Precio:</span>
+                                    <p className="font-medium text-gray-900 dark:text-white mt-1">
+                                      ${suggestion.action.currentPrice}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Solo mostrar descripción si va a cambiar */}
+                                {hasDescriptionChange && suggestion.action.currentDescription && (
+                                  <div>
+                                    <span className="text-gray-600 dark:text-gray-400">Descripción:</span>
+                                    <p className="text-gray-700 dark:text-gray-300 mt-1 text-sm leading-relaxed">
+                                      {suggestion.action.currentDescription}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Después */}
+                            <div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="px-3 py-1 bg-blue-600 rounded-full">
+                                  <span className="text-xs font-semibold text-white">DESPUÉS</span>
+                                </div>
+                              </div>
+
+                              {/* Nueva imagen solo si cambió */}
+                              {hasImageChange && suggestion.action.proposedImageUrl && (
+                                <div className="mb-3">
+                                  <img
+                                    src={suggestion.action.proposedImageUrl}
+                                    alt="Nueva imagen"
+                                    className="w-full h-32 object-cover rounded-lg border-2 border-blue-500 dark:border-blue-400"
+                                  />
+                                </div>
+                              )}
+
+                              <div className="space-y-2 text-sm">
+                                <div>
+                                  <span className="text-gray-600 dark:text-gray-400">Producto:</span>
+                                  <p className="font-bold text-gray-900 dark:text-white mt-1">
+                                    {suggestion.action.itemName}
+                                  </p>
+                                </div>
+
+                                {/* Precio - solo si cambió */}
+                                {hasPriceChange && (
+                                  <div>
+                                    <span className="text-gray-600 dark:text-gray-400">Precio:</span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <span className="text-gray-500 line-through">${suggestion.action.currentPrice}</span>
+                                                                      <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 rounded-lg font-bold text-green-700 dark:text-green-400">
+                                        ${suggestion.action.proposedPrice}
+                                                                      </span>
+                                                                    </div>
+                                                                  </div>
+                                                                )}
+
+                                                                {/* Descripción - solo si cambió */}
+                                                                {hasDescriptionChange && suggestion.action.proposedDescription && (
+                                                                  <div>
+                                                                    <span className="text-gray-600 dark:text-gray-400">Descripción:</span>
+                                                                    <p className="text-blue-700 dark:text-blue-300 mt-1 text-sm leading-relaxed font-medium">
+                                                                      {suggestion.action.proposedDescription}
+                                                                    </p>
+                                                                  </div>
+                                                                )}
+                                                              </div>
+                                                            </div>
+                                                          </div>
+                                                        );
+                                                      })()}
+
+                                                      {/* Warning */}
+                                                      <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-800">
+                                                        <div className="flex items-start gap-2">
+                                                          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                                                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                                                            <span className="font-semibold text-gray-700 dark:text-gray-300">Importante:</span> Al aceptar esta sugerencia, los cambios se aplicarán directamente en PedidosYa y serán visibles para los clientes de inmediato.
+                                                          </p>
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  )}
 
                   {/* Items affected */}
                   {suggestion.items && suggestion.items.length > 0 && (
@@ -301,7 +447,7 @@ export function SuggestionsPage() {
                   )}
 
                   {/* Metrics Before/After */}
-                  {suggestion.status === 'COMPLETED' && suggestion.metricsBefore && suggestion.metricsAfter && (
+                  {suggestion.status === 'APPLIED' && suggestion.metricsBefore && suggestion.metricsAfter && (
                     <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
                       <div className="flex items-center gap-2 mb-3">
                         <Target className="h-5 w-5 text-green-600 dark:text-green-400" />

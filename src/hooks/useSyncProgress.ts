@@ -10,7 +10,12 @@ interface UseSyncProgressOptions {
 }
 
 /**
- * Hook para manejar el progreso de sincronización con un solo toast persistente
+ * Hook para manejar el progreso de sincronización
+ *
+ * NOTA: Por defecto los toasts están desactivados porque usamos SyncBanner
+ * que es más persistente y visible. Activa showToast solo si necesitas
+ * notificaciones adicionales al banner.
+ *
  * @param platform - Plataforma a sincronizar
  * @param options - Opciones de configuración
  */
@@ -18,7 +23,7 @@ export function useSyncProgress(platform: DeliveryPlatform, options: UseSyncProg
   const {
     onSyncComplete,
     onSyncError,
-    showToast = true,
+    showToast = false, // Desactivado por defecto - usamos SyncBanner ahora
   } = options;
 
   const syncContext = useSyncContext();
