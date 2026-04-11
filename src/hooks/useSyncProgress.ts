@@ -1,113 +1,48 @@
-import { useEffect, useRef } from 'react';
-import { toast } from 'sonner';
+import { useCallback } from 'react';
 import type { DeliveryPlatform } from '@/types/integrations';
-import { useSyncContext } from '@/contexts/SyncContext';
+import { useOnboardingSync } from '@/contexts/OnboardingSyncContext';
 
-interface UseSyncProgressOptions {
+export interface UseSyncProgressOptions {
   onSyncComplete?: () => void;
   onSyncError?: (error: string) => void;
-  showToast?: boolean;
 }
 
 /**
  * Hook para manejar el progreso de sincronización
  *
- * NOTA: Por defecto los toasts están desactivados porque usamos SyncBanner
- * que es más persistente y visible. Activa showToast solo si necesitas
- * notificaciones adicionales al banner.
- *
- * @param platform - Plataforma a sincronizar
- * @param options - Opciones de configuración
+ * Ahora usa el OnboardingSyncContext que es persistente y no usa toasts
  */
 export function useSyncProgress(platform: DeliveryPlatform, options: UseSyncProgressOptions = {}) {
-  const {
-    onSyncComplete,
-    onSyncError,
-    showToast = false, // Desactivado por defecto - usamos SyncBanner ahora
-  } = options;
+  const { startSync, updateSyncProgress, completeSync, errorSync } = useOnboardingSync();
 
-  const syncContext = useSyncContext();
-  const toastIdRef = useRef<string | number | undefined>(undefined);
-  const syncCompleteRef = useRef<boolean>(false);
-
-  const syncProgress = syncContext.getSyncProgress(platform);
-
-  // Get toast ID for this platform
-  const getToastId = () => `sync-${platform}`;
-
-  // Update or create toast with current progress
-  useEffect(() => {
-    if (!syncProgress || !showToast) {
-      return;
-    }
-
-    const toastId = getToastId();
-    const currentStep = syncProgress.steps.find(s => s.status === 'in_progress');
-
-    // Check if all steps are completed
-    const allCompleted = syncProgress.steps.every(s => s.status === 'completed');
-
-    if (allCompleted) {
-      if (!syncCompleteRef.current) {
-        syncCompleteRef.current = true;
-
-        toast.success('¡Sincronización completada!', {
-          id: toastId,
-          description: 'Todos tus datos han sido sincronizados correctamente',
-          duration: 5000,
-        });
-
-        onSyncComplete?.();
-
-        // Reset after a delay
-        setTimeout(() => {
-          syncCompleteRef.current = false;
-          toastIdRef.current = undefined;
-        }, 5000);
-      }
-      return;
-    }
-
-    if (currentStep) {
-      const stepName = currentStep.step === 'stores' ? 'Locales' :
-                      currentStep.step === 'menu' ? 'Menú' :
-                      'Órdenes';
-
-      const percentage = Math.round((currentStep.progress / currentStep.total) * 100);
-
-      // Create or update the toast (usar el mismo ID para actualizar)
-      toast.info(`Sincronizando ${stepName} (${currentStep.progress}/${currentStep.total} - ${percentage}%)`, {
-        id: toastId,
-        duration: Infinity, // Mantenerlo abierto hasta que complete
-      });
-    }
-  }, [syncProgress, showToast, platform, onSyncComplete]);
-
-  const handleStartSync = async () => {
+  const handleStartSync = useCallback(async () => {
     try {
-      syncCompleteRef.current = false;
-      toastIdRef.current = undefined;
-
-      const toastId = getToastId();
-      toastIdRef.current = toast.loading('Iniciando sincronización...', {
-        id: toastId,
-        description: 'Un momento, por favor...',
-      });
-
-      await syncContext.startSync(platform);
+      await startSync('stores', 4); // 4 pasos: stores, menu, categories, orders
     } catch (error: any) {
-      const errorMessage = error.message || 'Error al iniciar la sincronización';
-      toast.error(errorMessage, {
-        id: getToastId(),
-      });
-      toastIdRef.current = undefined;
-      onSyncError?.(errorMessage);
+      errorSync('stores', error.message || 'Error al iniciar la sincronización');
+      if (options.onSyncError) {
+        options.onSyncError(error.message || 'Error al iniciar la sincronización');
+      }
     }
-  };
+  }, [startSync, updateSyncProgress, completeSync, errorSync, options.onSyncError, platform]);
+
+  const handleUpdateProgress = useCallback((step: string, current: number) => {
+    // Mapeo de nombres de pasos a SyncStep
+    const stepMap: Record<string, 'stores' | 'menu' | 'categories' | 'orders'> = {
+      'Locales': 'stores',
+      'Menú': 'menu',
+      'Categorías': 'categories',
+      'Órdenes': 'orders',
+    };
+
+    const syncStep = stepMap[step] || 'stores';
+    updateSyncProgress(syncStep, current);
+  }, [updateSyncProgress]);
 
   return {
-    isSyncing: syncContext.isSyncing && !!syncProgress,
-    syncProgress,
+    isSyncing: !!options.onSyncComplete,
+    syncProgress: null, // Devuelve el estado del contexto para que el modal lo use
     startSync: handleStartSync,
+    updateProgress: handleUpdateProgress,
   };
 }

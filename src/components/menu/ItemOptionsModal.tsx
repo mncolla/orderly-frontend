@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, memo, useCallback } from 'react';
 import { ListChecks, X, Package, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -20,103 +20,29 @@ interface ItemOptionsModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function ItemOptionsModal({
-  storeId,
-  itemName,
-  itemOptionIds,
-  open,
-  onOpenChange,
-}: ItemOptionsModalProps) {
-  const [selectedOption, setSelectedOption] = useState<ItemOption | null>(null);
+// Move helper functions outside component to prevent re-creation
+const getTypeLabel = (type: string) => {
+  return type === 'CHOICES' ? 'Elección' : 'Bundle';
+};
 
-  // Fetch all options for the store
-  const { data: optionsData, isLoading } = useQuery({
-    queryKey: ['item-options', storeId],
-    queryFn: () => itemOptionsService.getOptions(storeId),
-    enabled: open && !!storeId,
-  });
+const getTypeColor = (type: string) => {
+  return type === 'CHOICES'
+    ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+    : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+};
 
-  // Filter options that belong to this item (if itemOptionIds provided)
-  const itemOptions = itemOptionIds
-    ? optionsData?.options.filter((opt) => itemOptionIds.includes(opt.externalId)) || []
-    : optionsData?.options || [];
-
-  const totalOptions = itemOptions.length;
-  const totalValues = itemOptions.reduce((sum, opt) => sum + opt.values.length, 0);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh]">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <ListChecks className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <DialogTitle className="text-lg">Opciones del Producto</DialogTitle>
-              <DialogDescription className="text-sm">
-                {itemName}
-                {totalOptions > 0 && (
-                  <span className="ml-2">
-                    <Badge variant="secondary" className="ml-2">
-                      {totalOptions} opción{totalOptions !== 1 ? 'es' : ''}
-                    </Badge>
-                    <Badge variant="secondary" className="ml-1">
-                      {totalValues} valor{totalValues !== 1 ? 'es' : ''}
-                    </Badge>
-                  </span>
-                )}
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <ScrollArea className="max-h-[60vh] pr-4">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-            </div>
-          ) : totalOptions === 0 ? (
-            <div className="text-center py-12">
-              <Package className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-              <p className="text-gray-600 dark:text-gray-400">
-                Este producto no tiene opciones disponibles
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4 mt-4">
-              {itemOptions.map((option) => (
-                <OptionCard
-                  key={option.id}
-                  option={option}
-                  isExpanded={selectedOption?.id === option.id}
-                  onToggle={() => setSelectedOption(selectedOption?.id === option.id ? null : option)}
-                />
-              ))}
-            </div>
-          )}
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-interface OptionCardProps {
+// Memoize OptionCard to prevent re-renders when other options expand/collapse
+const OptionCard = memo(function OptionCard({ option, isExpanded, onToggle }: {
   option: ItemOption;
   isExpanded: boolean;
   onToggle: () => void;
-}
-
-function OptionCard({ option, isExpanded, onToggle }: OptionCardProps) {
-  const getTypeLabel = (type: string) => {
-    return type === 'CHOICES' ? 'Elección' : 'Bundle';
-  };
-
-  const getTypeColor = (type: string) => {
-    return type === 'CHOICES'
-      ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-      : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
-  };
+}) {
+  const minMaxLabel = useMemo(() => {
+    if (option.minQuantity === option.maxQuantity) {
+      return `${option.minQuantity} requerida`;
+    }
+    return `${option.minQuantity} - ${option.maxQuantity || '∞'}`;
+  }, [option.minQuantity, option.maxQuantity]);
 
   return (
     <div className="border rounded-lg overflow-hidden">
@@ -137,11 +63,7 @@ function OptionCard({ option, isExpanded, onToggle }: OptionCardProps) {
               </Badge>
             </div>
             <div className="flex items-center gap-3 mt-1 text-sm text-gray-600 dark:text-gray-400">
-              <span>
-                {option.minQuantity === option.maxQuantity
-                  ? `${option.minQuantity} requerida`
-                  : `${option.minQuantity} - ${option.maxQuantity || '∞'}`}
-              </span>
+              <span>{minMaxLabel}</span>
               <span>•</span>
               <span>{option.values.length} valor{option.values.length !== 1 ? 'es' : ''}</span>
             </div>
@@ -199,5 +121,97 @@ function OptionCard({ option, isExpanded, onToggle }: OptionCardProps) {
         </div>
       )}
     </div>
+  );
+});
+
+export function ItemOptionsModal({
+  storeId,
+  itemName,
+  itemOptionIds,
+  open,
+  onOpenChange,
+}: ItemOptionsModalProps) {
+  const [selectedOption, setSelectedOption] = useState<ItemOption | null>(null);
+
+  // Fetch all options for the store
+  const { data: optionsData, isLoading } = useQuery({
+    queryKey: ['item-options', storeId],
+    queryFn: () => itemOptionsService.getOptions(storeId),
+    enabled: open && !!storeId,
+  });
+
+  // Memoize itemOptions to prevent recalculation on every render
+  const itemOptions = useMemo(() => {
+    if (!optionsData?.options) return [];
+    if (!itemOptionIds) return optionsData.options;
+    return optionsData.options.filter((opt) => itemOptionIds.includes(opt.externalId));
+  }, [optionsData, itemOptionIds]);
+
+  const totalOptions = itemOptions.length;
+  const totalValues = useMemo(() =>
+    itemOptions.reduce((sum, opt) => sum + opt.values.length, 0),
+  [itemOptions]
+  );
+
+  const handleToggleOption = useCallback((option: ItemOption) => {
+    setSelectedOption(prev =>
+      prev?.id === option.id ? null : option
+    );
+  }, []);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[80vh]">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <ListChecks className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg">Opciones del Producto</DialogTitle>
+              <DialogDescription className="text-sm">
+                {itemName}
+                {totalOptions > 0 && (
+                  <span className="ml-2">
+                    <Badge variant="secondary" className="ml-2">
+                      {totalOptions} opción{totalOptions !== 1 ? 'es' : ''}
+                    </Badge>
+                    <Badge variant="secondary" className="ml-1">
+                      {totalValues} valor{totalValues !== 1 ? 'es' : ''}
+                    </Badge>
+                  </span>
+                )}
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <ScrollArea className="max-h-[60vh] pr-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            </div>
+          ) : totalOptions === 0 ? (
+            <div className="text-center py-12">
+              <Package className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+              <p className="text-gray-600 dark:text-gray-400">
+                Este producto no tiene opciones disponibles
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4 mt-4">
+              {itemOptions.map((option) => (
+                <OptionCard
+                  key={option.id}
+                  option={option}
+                  isExpanded={selectedOption?.id === option.id}
+                  onToggle={() => handleToggleOption(option)}
+                />
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 }

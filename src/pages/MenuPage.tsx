@@ -1,3 +1,4 @@
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Utensils, Store, Package, DollarSign, Grid3x3, X, Filter } from 'lucide-react';
@@ -7,6 +8,40 @@ import { MenuTable } from '@/components/menu/MenuTable';
 import { StoreSelector, type StoreWithPlatform } from '@/components/menu/StoreSelector';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+
+// Move StatCard outside component to prevent re-creation
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  icon: any;
+  color: string;
+}
+
+const colorClassesMap = {
+  blue: 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-500/30',
+  purple: 'bg-gradient-to-br from-purple-500 to-purple-600 shadow-purple-500/30',
+  green: 'bg-gradient-to-br from-green-500 to-green-600 shadow-green-500/30',
+  orange: 'bg-gradient-to-br from-orange-500 to-orange-600 shadow-orange-500/30',
+} as const;
+
+const StatCard = ({ title, value, icon: Icon, color }: StatCardProps) => {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-shadow">
+      <div className="flex items-center gap-4">
+        <div className={`p-3 rounded-xl ${colorClassesMap[color as keyof typeof colorClassesMap]} shadow-lg`}>
+          <Icon className="h-6 w-6 text-white" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Memoize StatCard to prevent unnecessary re-renders
+const MemoizedStatCard = React.memo(StatCard);
 
 export function MenuPage() {
   const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
@@ -54,41 +89,15 @@ export function MenuPage() {
   }, [menuData, selectedCategory]);
 
   const totalItems = filteredItems.length;
-  const avgPrice =
+  const avgPrice = useMemo(() =>
     totalItems > 0
       ? filteredItems.reduce((sum, item) => sum + item.minPrice, 0) / totalItems
-      : 0;
+      : 0,
+  [filteredItems, totalItems]
+  );
 
-  const categoryStats = menuData?.categories || [];
+  const categoryStats = useMemo(() => menuData?.categories || [], [menuData]);
   const uniqueCategories = categoryStats.length;
-
-  const StatCard = ({ title, value, icon: Icon, color }: {
-    title: string;
-    value: string | number;
-    icon: any;
-    color: string;
-  }) => {
-    const colorClasses = {
-      blue: 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-500/30',
-      purple: 'bg-gradient-to-br from-purple-500 to-purple-600 shadow-purple-500/30',
-      green: 'bg-gradient-to-br from-green-500 to-green-600 shadow-green-500/30',
-      orange: 'bg-gradient-to-br from-orange-500 to-orange-600 shadow-orange-500/30',
-    };
-
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-shadow">
-        <div className="flex items-center gap-4">
-          <div className={`p-3 rounded-xl ${colorClasses[color as keyof typeof colorClasses]} shadow-lg`}>
-            <Icon className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{value}</p>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   if (isLoading) {
     return (
@@ -135,25 +144,25 @@ export function MenuPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-        <StatCard
+        <MemoizedStatCard
           title="Productos Totales"
           value={totalItems}
           icon={Grid3x3}
           color="blue"
         />
-        <StatCard
+        <MemoizedStatCard
           title="Categorías"
           value={uniqueCategories}
           icon={Package}
           color="purple"
         />
-        <StatCard
+        <MemoizedStatCard
           title="Precio Promedio"
           value={`$${avgPrice.toFixed(2)}`}
           icon={DollarSign}
           color="green"
         />
-        <StatCard
+        <MemoizedStatCard
           title="Locales"
           value={storesWithPlatform.length}
           icon={Store}

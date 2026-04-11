@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { ChevronRight, ChevronLeft, Check, Store, Loader2, TrendingUp, UtensilsCrossed, ShoppingCart, Home, Settings, Target, BarChart3 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check, Store, Loader2, TrendingUp, UtensilsCrossed, Home, Settings, Target, BarChart3, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useSyncContext } from '../contexts/SyncContext';
 import { useConnectPedidosYa } from '../hooks/useIntegrations';
-import { useSyncProgress } from '../hooks/useSyncProgress';
+import { useOnboardingSync } from '../contexts/OnboardingSyncContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,31 +46,28 @@ export function OnboardingWizard() {
   const [needsOTP, setNeedsOTP] = useState(false);
   const [connectionError, setConnectionError] = useState('');
 
-  // Sync states - now using hook
-  const { isSyncing, syncProgress, startSync: handleStartSync } = useSyncProgress(selectedPlatform, {
-    onSyncComplete: () => {
-      setTimeout(() => {
-        setCurrentStep('defaultConfig');
-      }, 1000);
-    },
-    onSyncError: (error) => {
-      setConnectionError(error);
-    },
-    showToast: true,
-  });
-
-  // Global sync state - to disable "Conectar cuenta" button during ANY sync
-  const { isSyncing: isAnySyncInProgress } = useSyncContext();
+  // Sync states - using new OnboardingSyncContext
+  const { state: syncState, startSync } = useOnboardingSync();
+  const { isBlocked, currentSync } = syncState;
 
   // Mutation for platform connection
   const connectMutation = useConnectPedidosYa();
 
   // Auto-start sync when connection is successful
   useEffect(() => {
-    if (createdIntegration && !isSyncing) {
-      handleStartSync();
+    if (createdIntegration && !currentSync) {
+      startSync('stores', 4); // Start sync with 4 total steps
     }
-  }, [createdIntegration, isSyncing, handleStartSync]);
+  }, [createdIntegration, currentSync, startSync]);
+
+  // Navigate to next step when sync completes
+  useEffect(() => {
+    if (currentSync?.status === 'completed') {
+      setTimeout(() => {
+        setCurrentStep('defaultConfig');
+      }, 1000);
+    }
+  }, [currentSync?.status]);
 
   // Default configuration (Step 2)
   const [defaultConfig, setDefaultConfig] = useState({
@@ -364,7 +360,7 @@ export function OnboardingWizard() {
 
                   <Button
                     type="submit"
-                    disabled={isLoading || connectMutation.isPending || isAnySyncInProgress}
+                    disabled={isLoading || connectMutation.isPending || isBlocked}
                     className="w-full h-10 sm:h-11 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 !disabled:opacity-50 !disabled:cursor-not-allowed"
                   >
                     {isLoading || connectMutation.isPending ? (
@@ -372,7 +368,7 @@ export function OnboardingWizard() {
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Conectando...
                       </>
-                    ) : isAnySyncInProgress ? (
+                    ) : isBlocked ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Sincronizando...
@@ -412,7 +408,7 @@ export function OnboardingWizard() {
 
                   <Button
                     type="submit"
-                    disabled={connectMutation.isPending || otpCode.length !== 6 || isAnySyncInProgress}
+                    disabled={connectMutation.isPending || otpCode.length !== 6 || isBlocked}
                     className="w-full h-10 sm:h-11 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30"
                   >
                     {connectMutation.isPending ? (
@@ -420,7 +416,7 @@ export function OnboardingWizard() {
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Verificando...
                       </>
-                    ) : isAnySyncInProgress ? (
+                    ) : isBlocked ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Sincronizando...
@@ -441,71 +437,72 @@ export function OnboardingWizard() {
               )}
 
               {/* Sync progress */}
-              {isSyncing && syncProgress && (
+              {currentSync && (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span>Sincronizando tus datos...</span>
                   </div>
 
-                  {syncProgress.steps.map((step, idx) => {
-                    const StepIcon = step.step === 'stores' ? Store :
-                                    step.step === 'menu' ? UtensilsCrossed : ShoppingCart;
+                  <Card className="p-3 sm:p-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${
+                        currentSync.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30' :
+                        currentSync.status === 'in_progress' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                        currentSync.status === 'error' ? 'bg-red-100 dark:bg-red-900/30' :
+                        'bg-gray-100 dark:bg-gray-700'
+                      }`}>
+                        {currentSync.status === 'completed' ? (
+                          <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        ) : currentSync.status === 'in_progress' ? (
+                          <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin" />
+                        ) : currentSync.status === 'error' ? (
+                          <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        ) : (
+                          <Store className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                        )}
+                      </div>
 
-                    return (
-                      <Card key={idx} className="p-3 sm:p-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${
-                            step.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30' :
-                            step.status === 'in_progress' ? 'bg-blue-100 dark:bg-blue-900/30' :
-                            'bg-gray-100 dark:bg-gray-700'
-                          }`}>
-                            {step.status === 'completed' ? (
-                              <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                            ) : step.status === 'in_progress' ? (
-                              <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin" />
-                            ) : (
-                              <StepIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                            )}
-                          </div>
-
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium">
-                                {step.step === 'stores' ? 'Locales' :
-                                 step.step === 'menu' ? 'Menú' : 'Órdenes'}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {step.progress}/{step.total}
-                              </span>
-                            </div>
-
-                            {(step.status === 'in_progress' || step.status === 'completed') && (
-                              <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full transition-all ${
-                                    step.status === 'completed' ? 'bg-green-500' : 'bg-blue-500'
-                                  }`}
-                                  style={{ width: `${(step.progress / step.total) * 100}%` }}
-                                />
-                              </div>
-                            )}
-
-                            {step.message && (
-                              <p className="text-xs text-gray-500 mt-1">{step.message}</p>
-                            )}
-                          </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium">
+                            {currentSync.name}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {currentSync.progress}%
+                          </span>
                         </div>
-                      </Card>
-                    );
-                  })}
+
+                        {currentSync.status === 'in_progress' && (
+                          <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div
+                              className="h-full transition-all bg-blue-500"
+                              style={{ width: `${currentSync.progress}%` }}
+                            />
+                          </div>
+                        )}
+
+                        {currentSync.description && currentSync.status !== 'in_progress' && (
+                          <p className="text-xs text-gray-500 mt-1">{currentSync.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
                 </div>
               )}
 
-              {syncProgress?.steps.every(s => s.status === 'completed') && (
+              {currentSync?.status === 'completed' && (
                 <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
                   <Check className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
                   <p className="font-semibold text-green-900 dark:text-green-100">¡Sincronización completada!</p>
+                </div>
+              )}
+
+              {currentSync?.status === 'error' && (
+                <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-xl">
+                  <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400 mx-auto mb-2" />
+                  <p className="font-semibold text-red-900 dark:text-red-100">¡Error en la sincronización!</p>
+                  <p className="text-sm text-red-700 dark:text-red-300 mt-1">{currentSync.description}</p>
                 </div>
               )}
             </div>

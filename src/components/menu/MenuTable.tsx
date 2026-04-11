@@ -12,25 +12,35 @@ import { StoresPopover, type StoreInfo } from './StoresPopover';
 import { ImageModal } from './ImageModal';
 import { ItemOptionsModal } from './ItemOptionsModal';
 import { ListChecks } from 'lucide-react';
-import { useState } from 'react';
+import { useState, memo, useCallback } from 'react';
 
 interface MenuTableProps {
   items: MenuItem[];
 }
 
-export function MenuTable({ items }: MenuTableProps) {
+// Move formatPrice outside component to prevent re-creation
+const formatPrice = (item: MenuItem): string => {
+  if (item.minPrice === item.maxPrice) {
+    return `$${item.minPrice.toFixed(2)}`;
+  }
+  return `$${item.minPrice.toFixed(2)} - $${item.maxPrice.toFixed(2)}`;
+};
+
+// Memoize the entire table to prevent re-renders from parent
+export const MenuTable = memo(function MenuTable({ items }: MenuTableProps) {
   const [selectedItem, setSelectedItem] = useState<{
     storeId: string;
     itemName: string;
     itemOptionIds?: string[];
   } | null>(null);
 
-  const formatPrice = (item: MenuItem): string => {
-    if (item.minPrice === item.maxPrice) {
-      return `$${item.minPrice.toFixed(2)}`;
-    }
-    return `$${item.minPrice.toFixed(2)} - $${item.maxPrice.toFixed(2)}`;
-  };
+  const handleOpenOptions = useCallback((storeId: string, itemName: string, itemOptionIds?: string[]) => {
+    setSelectedItem({ storeId, itemName, itemOptionIds });
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setSelectedItem(null);
+  }, []);
 
   if (items.length === 0) {
     return (
@@ -95,11 +105,7 @@ export function MenuTable({ items }: MenuTableProps) {
                   <TableCell className="hidden sm:table-cell">
                     {firstStoreId && (
                       <button
-                        onClick={() => setSelectedItem({
-                          storeId: firstStoreId,
-                          itemName: item.name,
-                          itemOptionIds: item.itemOptionIds,
-                        })}
+                        onClick={() => handleOpenOptions(firstStoreId, item.name, item.itemOptionIds)}
                         className="flex items-center gap-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 px-3 py-1.5 rounded-lg transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
                         disabled={!firstStoreId}
                       >
@@ -144,9 +150,9 @@ export function MenuTable({ items }: MenuTableProps) {
           itemName={selectedItem.itemName}
           itemOptionIds={selectedItem.itemOptionIds}
           open={!!selectedItem}
-          onOpenChange={(open) => !open && setSelectedItem(null)}
+          onOpenChange={(open) => !open && handleCloseModal()}
         />
       )}
     </>
   );
-}
+});

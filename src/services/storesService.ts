@@ -48,6 +48,16 @@ export interface ItemOption {
   maxQuantity: number | null;
   lastSyncAt: string | null;
   values: ItemOptionValue[];
+  itemRelations?: Array<{
+    item?: {
+      id: string;
+      externalId: string;
+      name: string;
+      description: string;
+      imageUrl: string;
+      categoryId: string;
+    };
+  }>;
 }
 
 export interface Store {
@@ -57,6 +67,7 @@ export interface Store {
   city: string | null;
   country: string | null;
   platform?: string;
+  vendorGroupId?: string | null;
   storeItems: StoreItem[];
   storeCategories: Array<{
     id: string;

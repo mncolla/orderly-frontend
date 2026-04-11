@@ -2,12 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../services/api';
 import { storesService } from '../services/storesService';
+import { eventsService } from '../services/eventsService';
 import type { SuggestionType, SuggestionTypeConfig, DeliveryPlatform } from '@/types/integrations';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { CheckCircle, XCircle, Clock, Sparkles, Edit3, Store, Zap, Package, Star, Settings, Loader2, Save, BarChart3, Activity, ExternalLink } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Sparkles, Edit3, Store, Zap, Package, Star, Settings, Loader2, Save, BarChart3, Activity, ExternalLink, Calendar, Music, Trophy, PartyPopper } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -34,11 +35,7 @@ interface Store {
   city: string | null;
   country: string | null;
   platform?: DeliveryPlatform;
-}
-
-interface StoreWithGroup {
-  chainName: string;
-  stores: Store[];
+  vendorGroupId?: string | null;
 }
 
 interface Suggestion {
@@ -69,6 +66,17 @@ interface PlatformIntegration {
     city: string | null;
     country: string | null;
   }>;
+}
+
+interface StoreItem {
+  id: string;
+  itemId: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  categoryName: string;
+  categoryId: string;
+  price: number;
 }
 
 // Types configuration
@@ -109,7 +117,7 @@ export function AgencyPage() {
   // Estado
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
-  const [userStores, setUserStores] = useState<StoreWithGroup[]>([]);
+  const [userStores, setUserStores] = useState<Store[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState<string>('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -133,6 +141,11 @@ export function AgencyPage() {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [isStoreConfigModalOpen, setIsStoreConfigModalOpen] = useState(false);
+
+  // Search states
+  const [storeSearchQuery, setStoreSearchQuery] = useState('');
+  const [itemSearchQuery, setItemSearchQuery] = useState('');
+  const [expandedMenuGroups, setExpandedMenuGroups] = useState<Set<string>>(new Set());
 
   // Image upload state
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -168,35 +181,129 @@ export function AgencyPage() {
 
     const fetchUserStores = async () => {
       try {
-        const response = await api.get(`/platform-integrations?userId=${selectedUserId}`) as { integrations: PlatformIntegration[] };
-        const integrations = response.integrations || [];
+        // Get stores with vendorGroupId data
+        const response = await api.get(`/stores`) as { stores: Store[] };
+        const allStores = response.stores || [];
 
-        const groupedStores: StoreWithGroup[] = [];
+        // Filter stores that belong to the selected user's integrations
+        const response2 = await api.get(`/platform-integrations?userId=${selectedUserId}`) as { integrations: PlatformIntegration[] };
+        const integrations = response2.integrations || [];
+
+        // Get store IDs from user's integrations
+        const userStoreIds = new Set<string>();
         integrations.forEach((integration: PlatformIntegration) => {
-          if (integration.stores && integration.stores.length > 0) {
-            groupedStores.push({
-              chainName: integration.stores[0].chainName,
-              stores: integration.stores.map(store => ({
-                id: store.id,
-                name: store.name,
-                chainName: store.chainName,
-                city: store.city,
-                country: store.country,
-                platform: integration.platform,
-              })),
+          if (integration.stores) {
+            integration.stores.forEach(store => {
+              userStoreIds.add(store.id);
             });
           }
         });
 
-        setUserStores(groupedStores);
+        // Filter and map stores with vendorGroupId
+        const filteredStores = allStores
+          .filter(store => userStoreIds.has(store.id))
+          .map(store => ({
+            id: store.id,
+            name: store.name,
+            chainName: store.chainName,
+            city: store.city,
+            country: store.country,
+            platform: store.platform,
+            vendorGroupId: store.vendorGroupId,
+          }));
+
+        setUserStores(filteredStores);
         setSelectedStoreId('');
       } catch (error) {
-        console.error('Error fetching stores:', error);
+        console.error('Error fetching stores:', error)
       }
     };
 
     fetchUserStores();
   }, [selectedUserId]);
+
+  // Group stores by vendorGroupId to show which stores share menu
+  // For selection, we only show ONE option per shared menu group
+  const menuGroupsForSelection = useMemo(() => {
+    if (userStores.length === 0) return [];
+
+    // Group stores by vendorGroupId (stores with same vendorGroupId share menu)
+    const menuGroups = new Map<string, Store[]>();
+
+    userStores.forEach(store => {
+      if (store.vendorGroupId) {
+        // Store has a vendorGroupId, group with others that have the same
+        if (!menuGroups.has(store.vendorGroupId)) {
+          menuGroups.set(store.vendorGroupId, []);
+        }
+        menuGroups.get(store.vendorGroupId)!.push(store);
+      }
+      // Stores without vendorGroupId will be added as individual later
+    });
+
+    // Convert groups to array
+    const groups: Array<{
+      groupName: string;
+      representativeStore: Store;
+      allStores: Store[];
+      storeCount: number;
+      hasSharedMenu: boolean;
+      vendorGroupId: string;
+    }> = Array.from(menuGroups.entries()).map(([vendorGroupId, stores]) => ({
+      groupName: stores[0].chainName || 'Grupo',
+      representativeStore: stores[0],
+      allStores: stores,
+      storeCount: stores.length,
+      hasSharedMenu: stores.length > 1,
+      vendorGroupId,
+    }));
+
+    // Add stores without vendorGroupId as individual groups
+    userStores.forEach(store => {
+      if (!store.vendorGroupId) {
+        groups.push({
+          groupName: store.name,
+          representativeStore: store,
+          allStores: [store],
+          storeCount: 1,
+          hasSharedMenu: false,
+          vendorGroupId: `individual-${store.id}`,
+        });
+      }
+    });
+
+    return groups;
+  }, [userStores]);
+
+  // Filter menu groups by search query
+  const filteredMenuGroups = useMemo(() => {
+    if (!storeSearchQuery) return menuGroupsForSelection;
+
+    const query = storeSearchQuery.toLowerCase();
+    return menuGroupsForSelection.filter(group =>
+      group.representativeStore.name.toLowerCase().includes(query) ||
+      group.allStores.some(store => store.name.toLowerCase().includes(query))
+    );
+  }, [menuGroupsForSelection, storeSearchQuery]);
+
+  // Toggle menu group expansion
+  const toggleMenuGroup = (vendorGroupId: string) => {
+    const newExpanded = new Set(expandedMenuGroups);
+    if (newExpanded.has(vendorGroupId)) {
+      newExpanded.delete(vendorGroupId);
+    } else {
+      newExpanded.add(vendorGroupId);
+    }
+    setExpandedMenuGroups(newExpanded);
+  };
+
+  // Auto-expand all groups when searching
+  useEffect(() => {
+    if (storeSearchQuery) {
+      const allVendorGroupIds = menuGroupsForSelection.map(g => g.vendorGroupId);
+      setExpandedMenuGroups(new Set(allVendorGroupIds));
+    }
+  }, [storeSearchQuery, menuGroupsForSelection]);
 
   // Fetch suggestions when store is selected
   useEffect(() => {
@@ -238,9 +345,7 @@ export function AgencyPage() {
       return SUGGESTION_TYPES.filter(type => type.platform === null);
     }
 
-    const selectedStore = userStores
-      .flatMap(group => group.stores)
-      .find(store => store.id === selectedStoreId);
+    const selectedStore = userStores.find(store => store.id === selectedStoreId);
 
     if (!selectedStore?.platform) {
       return SUGGESTION_TYPES.filter(type => type.platform === null);
@@ -252,7 +357,7 @@ export function AgencyPage() {
     );
   }, [selectedStoreId, userStores]);
 
-  // Query to fetch store items
+  // Query to fetch store items (agencies can access any store)
   const { data: storeItemsData } = useQuery({
     queryKey: ['store-items', selectedStoreId],
     queryFn: async () => {
@@ -262,17 +367,56 @@ export function AgencyPage() {
     enabled: !!selectedStoreId,
   });
 
-  const storeItems = useMemo(() => {
+  const storeItems: StoreItem[] = useMemo(() => {
     if (!storeItemsData?.store?.storeItems) return [];
     return storeItemsData.store.storeItems.map((si: any) => ({
       id: si.id,
+      itemId: si.itemId,
       name: si.item.name,
       description: si.item.description,
       imageUrl: si.item.imageUrl,
       categoryName: si.item.category?.name || 'Sin categoría',
-      price: si.price,
+      categoryId: si.item.categoryId,
+      price: typeof si.price === 'string' ? parseFloat(si.price) : (si.price || 0),
     }));
   }, [storeItemsData]);
+
+  // Group items by category
+  const itemsByCategory = useMemo(() => {
+    if (itemSearchQuery) {
+      const query = itemSearchQuery.toLowerCase();
+      const filtered = storeItems.filter(item =>
+        item.name.toLowerCase().includes(query)
+      );
+
+      const grouped = new Map<string, typeof storeItems>();
+      filtered.forEach(item => {
+        if (!grouped.has(item.categoryName)) {
+          grouped.set(item.categoryName, []);
+        }
+        grouped.get(item.categoryName)!.push(item);
+      });
+
+      return Array.from(grouped.entries()).map(([categoryName, items]) => ({
+        categoryName,
+        items,
+      }));
+    }
+
+    // No search, show all grouped
+    const grouped = new Map<string, typeof storeItems>();
+    storeItems.forEach(item => {
+      if (!grouped.has(item.categoryName)) {
+        grouped.set(item.categoryName, []);
+      }
+      grouped.get(item.categoryName)!.push(item);
+    });
+
+    return Array.from(grouped.entries()).map(([categoryName, items]) => ({
+      categoryName,
+      items,
+    }));
+  }, [storeItems, itemSearchQuery]);
 
   const selectedItem = useMemo(() => {
     if (!formData.itemId) return null;
@@ -292,10 +436,38 @@ export function AgencyPage() {
   // Filter options to only show those related to the selected item
   const itemOptions = useMemo(() => {
     if (!itemOptionsData?.options || !formData.itemId) return [];
-    // TODO: Filter by item-option relationships when the API provides this data
-    // For now, showing all options for the store
-    return itemOptionsData.options;
-  }, [itemOptionsData, formData.itemId]);
+
+    console.log('🔍 Filtering itemOptions for selected item:', formData.itemId);
+    console.log('📊 Total options in store:', itemOptionsData.options?.length);
+
+    // Filter options by item-option relationships
+    // Get the StoreItem itemId from the selected item
+    const selectedStoreItem = storeItems.find(item => item.id === formData.itemId);
+    console.log('🎯 Selected StoreItem:', selectedStoreItem);
+
+    if (!selectedStoreItem) {
+      console.log('❌ No StoreItem found for selected item');
+      return [];
+    }
+
+    // Filter options that have a relation with this item
+    const filtered = itemOptionsData.options.filter(option => {
+      const hasRelation = option.itemRelations?.some(relation => {
+        if (relation.item?.externalId === selectedStoreItem.itemId) {
+          console.log(`✅ Option "${option.name}" has relation with item "${selectedStoreItem.name}"`, {
+            itemExternalId: selectedStoreItem.itemId,
+            relationExternalId: relation.item?.externalId,
+          });
+          return true;
+        }
+        return false;
+      });
+      return hasRelation;
+    });
+
+    console.log(`📋 Filtered ${filtered.length} options for item "${selectedStoreItem.name}"`);
+    return filtered;
+  }, [itemOptionsData, formData.itemId, storeItems]);
 
   // Pre-fill form with current item data when item is selected
   useEffect(() => {
@@ -311,10 +483,26 @@ export function AgencyPage() {
 
   // Store config
   const { data: storeConfigData } = useQuery({
-    queryKey: ['store-config', selectedStoreId],
+    queryKey: ['store-config', selectedUserId, selectedStoreId],
+    queryFn: async () => {
+      if (!selectedStoreId || !selectedUserId) return null;
+      // Use agency endpoint: /api/users/:userId/stores/:storeId/config
+      return await storesService.getAgencyStoreConfig(selectedUserId, selectedStoreId);
+    },
+    enabled: !!selectedStoreId && !!selectedUserId,
+  });
+
+  // Upcoming events for the store's location
+  const { data: eventsData } = useQuery({
+    queryKey: ['events', selectedStoreId],
     queryFn: async () => {
       if (!selectedStoreId) return null;
-      return await storesService.getConfig(selectedStoreId);
+      const store = userStores.find(s => s.id === selectedStoreId);
+      if (!store) return null;
+      // Get events filtered by store's country and city
+      const countryParam = store.country || undefined;
+      const cityParam = store.city || undefined;
+      return await eventsService.getAll(countryParam, cityParam);
     },
     enabled: !!selectedStoreId,
   });
@@ -337,7 +525,7 @@ export function AgencyPage() {
         // Create suggestion with proposed changes
         action = {
           storeId: selectedStoreId,
-          storeName: userStores.flatMap(g => g.stores).find(s => s.id === selectedStoreId)?.name,
+          storeName: userStores.find(s => s.id === selectedStoreId)?.name,
           itemId: formData.itemId,
           itemName: selectedItem?.name,
           currentDescription: selectedItem?.description,
@@ -545,16 +733,59 @@ export function AgencyPage() {
         return (
           <div className="space-y-4">
             <div>
-              <Label className="text-sm font-medium mb-2 block">Item</Label>
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-sm font-medium mb-2 block">Item</Label>
+                {/* Item search */}
+                <div className="relative w-64">
+                  <input
+                    type="text"
+                    placeholder="Search items..."
+                    value={itemSearchQuery}
+                    onChange={(e) => setItemSearchQuery(e.target.value)}
+                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+                  />
+                </div>
+              </div>
+
               <Select value={formData.itemId} onValueChange={(value) => setFormData({ ...formData, itemId: value })}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select an item" />
                 </SelectTrigger>
                 <SelectContent>
-                  {storeItems.map(item => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name} - ${item.price}
-                    </SelectItem>
+                  {itemsByCategory.map((category) => (
+                    <div key={category.categoryName}>
+                      {/* Category header */}
+                      <div
+                        className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 sticky top-0"
+                      >
+                        📁 {category.categoryName} ({category.items.length})
+                      </div>
+                      {/* Items in this category */}
+                      {category.items.map((item: StoreItem) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          <div className="flex items-center gap-3 py-1">
+                            {/* Thumbnail */}
+                            {item.imageUrl ? (
+                              <img
+                                src={item.imageUrl}
+                                alt={item.name}
+                                className="w-10 h-10 object-cover rounded flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs text-gray-400">📷</span>
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm truncate">{item.name}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                ${item.price.toFixed(2)}
+                              </div>
+                            </div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </div>
                   ))}
                 </SelectContent>
               </Select>
@@ -698,7 +929,7 @@ export function AgencyPage() {
                   <SelectValue placeholder="Select an item" />
                 </SelectTrigger>
                 <SelectContent>
-                  {storeItems.map(item => (
+                  {storeItems.map((item: StoreItem) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.name} - ${item.price}
                     </SelectItem>
@@ -775,7 +1006,7 @@ export function AgencyPage() {
                   <SelectValue placeholder="Select an item to feature" />
                 </SelectTrigger>
                 <SelectContent>
-                  {storeItems.map(item => (
+                  {storeItems.map((item: StoreItem) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.name} - ${item.price}
                     </SelectItem>
@@ -795,9 +1026,7 @@ export function AgencyPage() {
     setIsStoreConfigModalOpen(true);
   };
 
-  const selectedStore = userStores
-    .flatMap(g => g.stores)
-    .find(s => s.id === selectedStoreId);
+  const selectedStore = userStores.find(s => s.id === selectedStoreId);
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6">
@@ -857,36 +1086,97 @@ export function AgencyPage() {
           {/* Store Selection Card */}
           {selectedUserId && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700">
-              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                <Store className="h-4 w-4" />
-                Select Store
-              </Label>
-              <div className="space-y-2">
-                {userStores.map((group) => (
-                  <div key={group.chainName}>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                      {group.chainName}
-                    </div>
-                    {group.stores.map((store) => (
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                  <Store className="h-4 w-4" />
+                  Select Store
+                </Label>
+                {/* Store search */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search stores..."
+                    value={storeSearchQuery}
+                    onChange={(e) => setStoreSearchQuery(e.target.value)}
+                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {filteredMenuGroups.map((menuGroup) => {
+                  const isExpanded = expandedMenuGroups.has(menuGroup.vendorGroupId);
+                  const isSelected = selectedStoreId === menuGroup.representativeStore.id;
+
+                  return (
+                    <div key={menuGroup.vendorGroupId} className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                      {/* Menu Group - Selectable */}
                       <button
-                        key={store.id}
-                        onClick={() => setSelectedStoreId(store.id)}
-                        className={`w-full px-4 py-2.5 text-left rounded-lg transition-all ${
-                          selectedStoreId === store.id
-                            ? 'bg-blue-500 text-white shadow-md'
-                            : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
-                        }`}
+                        onClick={() => setSelectedStoreId(menuGroup.representativeStore.id)}
+                        className="w-full bg-gray-50 dark:bg-gray-800 px-4 py-3 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       >
-                        <div className="font-medium text-sm">{store.name}</div>
-                        {store.city && (
-                          <div className={`text-xs ${selectedStoreId === store.id ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
-                            {store.city}
+                        <div className="flex items-center gap-3 flex-1">
+                          <Package className="h-4 w-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
+                          <div className="flex-1 text-left">
+                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              {menuGroup.hasSharedMenu
+                                ? `${menuGroup.representativeStore.name} y otros (${menuGroup.storeCount} locales)`
+                                : menuGroup.representativeStore.name
+                              }
+                            </div>
+                            {menuGroup.representativeStore.city && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                📍 {menuGroup.representativeStore.city}
+                                {menuGroup.hasSharedMenu && ` • Menú compartido`}
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isSelected && (
+                            <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                          )}
+                          {menuGroup.hasSharedMenu && (
+                            <svg
+                              className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleMenuGroup(menuGroup.vendorGroupId);
+                              }}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          )}
+                        </div>
                       </button>
-                    ))}
-                  </div>
-                ))}
+
+                      {/* Stores List - Only shown when expanded and has shared menu */}
+                      {isExpanded && menuGroup.hasSharedMenu && (
+                        <div className="p-3 space-y-1 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                            Locales que comparten menú:
+                          </div>
+                          {menuGroup.allStores.map((store) => (
+                            <div
+                              key={store.id}
+                              className={`px-3 py-2 rounded-lg text-sm ${
+                                store.id === menuGroup.representativeStore.id
+                                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
+                                  : 'text-gray-600 dark:text-gray-400'
+                              }`}
+                            >
+                              {store.name}
+                              {store.city && ` • ${store.city}`}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -934,6 +1224,62 @@ export function AgencyPage() {
                   </div>
                   <ExternalLink className="h-4 w-4 text-purple-500 group-hover:text-purple-600" />
                 </a>
+              </div>
+            </div>
+          )}
+
+          {/* Upcoming Events */}
+          {selectedStoreId && eventsData?.events && eventsData.events.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700">
+              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Próximos Eventos
+              </Label>
+              <div className="space-y-2">
+                {eventsData.events.slice(0, 5).map((event) => {
+                  const EventIcon = event.type === 'CONCERT'
+                    ? Music
+                    : event.type === 'SPORTS_EVENT'
+                    ? Trophy
+                    : PartyPopper;
+
+                  const iconBg = event.type === 'CONCERT'
+                    ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400'
+                    : event.type === 'SPORTS_EVENT'
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                    : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400';
+
+                  const formatDate = (date: string) => {
+                    const d = new Date(date);
+                    return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+                  };
+
+                  return (
+                    <div
+                      key={event.id}
+                      className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-xl border border-orange-100 dark:border-orange-900"
+                    >
+                      <div className={`p-2 rounded-lg ${iconBg}`}>
+                        <EventIcon className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                          {event.title}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                          <span>{formatDate(event.startDate)}</span>
+                          {event.city && <span>• {event.city}</span>}
+                        </div>
+                      </div>
+                      <Badge
+                        variant="secondary"
+                        className="text-xs"
+                      >
+                        {event.impactLevel}
+                      </Badge>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

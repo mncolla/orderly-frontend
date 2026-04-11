@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, Target, Languages, Check } from 'lucide-react';
+import { Settings as SettingsIcon, Target, Languages } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../hooks/useLanguage';
@@ -8,6 +8,13 @@ import { objectiveTypeLabels, ObjectiveType, ObjectiveUnit } from '../types/orga
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 
 export function SettingsPage() {
@@ -93,52 +100,32 @@ export function SettingsPage() {
           </div>
 
           <div className="p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button
-                onClick={() => {
-                  changeLanguage('en');
-                  toast.success(t('settings.toastLanguageEn'));
+            <div className="max-w-xs">
+              <Select
+                value={currentLanguage}
+                onValueChange={(value) => {
+                  changeLanguage(value as 'en' | 'es');
+                  toast.success(value === 'en' ? t('settings.toastLanguageEn') : t('settings.toastLanguageEs'));
                 }}
-                className={`
-                  flex items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200
-                  ${currentLanguage === 'en'
-                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                  }
-                `}
               >
-                <span className="text-2xl">🇺🇸</span>
-                <div className="text-left">
-                  <p className="font-medium text-gray-900 dark:text-white">English</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Inglés</p>
-                </div>
-                {currentLanguage === 'en' && (
-                  <Check className="h-5 w-5 text-blue-600 dark:text-blue-400 ml-auto" />
-                )}
-              </button>
-
-              <button
-                onClick={() => {
-                  changeLanguage('es');
-                  toast.success(t('settings.toastLanguageEs'));
-                }}
-                className={`
-                  flex items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200
-                  ${currentLanguage === 'es'
-                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                  }
-                `}
-              >
-                <span className="text-2xl">🇪🇷</span>
-                <div className="text-left">
-                  <p className="font-medium text-gray-900 dark:text-white">Español</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Spanish</p>
-                </div>
-                {currentLanguage === 'es' && (
-                  <Check className="h-5 w-5 text-blue-600 dark:text-blue-400 ml-auto" />
-                )}
-              </button>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">
+                    <div className="flex items-center gap-2">
+                      <span>🇺🇸</span>
+                      <span>English</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="es">
+                    <div className="flex items-center gap-2">
+                      <span>🇪🇸</span>
+                      <span>Español</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>

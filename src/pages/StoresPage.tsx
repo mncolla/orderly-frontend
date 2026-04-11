@@ -64,9 +64,9 @@ export function StoresPage() {
     platformCommission: 15,
     markupPercentage: 30,
     costOfGoods: 30,
-    fixedMonthlyCosts: 0,
-    packagingCost: 0,
-    deliveryCost: 0,
+    fixedMonthlyCosts: null, // MVP: Hidden
+    packagingCost: null,    // MVP: Hidden
+    deliveryCost: null,     // MVP: Hidden
   });
 
   // Expanded groups for accordion
@@ -380,31 +380,10 @@ export function StoresPage() {
                 onChange={(v) => setDefaultConfig({ ...defaultConfig, costOfGoods: v })}
                 helper={t('stores.costOfGoodsDesc')}
               />
-              <ConfigInput
-                id="defaultFixedCosts"
-                label={t('stores.fixedMonthlyCosts')}
-                suffix="$"
-                value={defaultConfig.fixedMonthlyCosts}
-                onChange={(v) => setDefaultConfig({ ...defaultConfig, fixedMonthlyCosts: v })}
-                helper={t('stores.fixedCostsDesc')}
-              />
-              <ConfigInput
-                id="defaultPackagingCost"
-                label={t('stores.packagingCost')}
-                suffix="$"
-                value={defaultConfig.packagingCost}
-                onChange={(v) => setDefaultConfig({ ...defaultConfig, packagingCost: v })}
-                helper={t('stores.packagingCostDesc')}
-              />
-              <ConfigInput
-                id="defaultDeliveryCost"
-                label={t('stores.deliveryCost')}
-                suffix="$"
-                value={defaultConfig.deliveryCost}
-                onChange={(v) => setDefaultConfig({ ...defaultConfig, deliveryCost: v })}
-                helper={t('stores.deliveryCostDesc')}
-              />
             </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+              ⚡ MVP: Solo los 3 valores principales. Los demás costos estarán disponibles en futuras versiones.
+            </p>
           </div>
         </div>
 
@@ -592,31 +571,10 @@ export function StoresPage() {
                   onChange={(v) => setStoreConfig({ ...storeConfig, costOfGoods: v })}
                   placeholder={t('stores.default')}
                 />
-                <ConfigInputModal
-                  id="storeFixedCosts"
-                  label={t('stores.fixedMonthlyCosts')}
-                  suffix="$"
-                  value={storeConfig.fixedMonthlyCosts}
-                  onChange={(v) => setStoreConfig({ ...storeConfig, fixedMonthlyCosts: v })}
-                  placeholder={t('stores.default')}
-                />
-                <ConfigInputModal
-                  id="storePackagingCost"
-                  label={t('stores.packagingCost')}
-                  suffix="$"
-                  value={storeConfig.packagingCost}
-                  onChange={(v) => setStoreConfig({ ...storeConfig, packagingCost: v })}
-                  placeholder={t('stores.default')}
-                />
-                <ConfigInputModal
-                  id="storeDeliveryCost"
-                  label={t('stores.deliveryCost')}
-                  suffix="$"
-                  value={storeConfig.deliveryCost}
-                  onChange={(v) => setStoreConfig({ ...storeConfig, deliveryCost: v })}
-                  placeholder={t('stores.default')}
-                />
               </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                ⚡ MVP: Solo los 3 valores principales. Configuración simplificada.
+              </p>
             </div>
           )}
 

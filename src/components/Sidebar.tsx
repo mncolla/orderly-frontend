@@ -17,6 +17,7 @@ const ownerSidebarItems = [
 
 const agencySidebarItems = [
   { href: '/agency', label: 'sidebar.agency', icon: Users },
+  { href: '/users', label: 'sidebar.users', icon: Users },
   { href: '/settings', label: 'sidebar.settings', icon: SettingsIcon },
 ];
 

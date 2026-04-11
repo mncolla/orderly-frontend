@@ -4,7 +4,8 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { OnboardingGuard } from './components/OnboardingGuard';
 import { Sidebar } from './components/Sidebar';
 import { OnboardingWizard } from './components/OnboardingWizard';
-import { SyncBanner } from './components/SyncBanner';
+import { OnboardingSyncModal } from './components/OnboardingSyncModal';
+import { OnboardingSyncProvider } from './contexts/OnboardingSyncContext';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import DebugPage from './pages/DebugPage';
@@ -18,6 +19,8 @@ import { IntegrationsPage } from './pages/IntegrationsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { StoresPage } from './pages/StoresPage';
 import { AgencyPage } from './pages/AgencyPage';
+import { UsersPage } from './pages/UsersPage';
+import { UserDetailPage } from './pages/UserDetailPage';
 import { useEffect, useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
 
@@ -39,8 +42,8 @@ function RoleBasedRedirect() {
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      {/* Banner persistente de sincronización */}
-      <SyncBanner />
+      {/* Onboarding Sync Modal */}
+      <OnboardingSyncModal />
 
       <Sidebar />
       <main className="lg:ml-64 min-h-screen">
@@ -55,7 +58,8 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <OnboardingSyncProvider>
+        <Router>
         {/* Debug routes - SIN AUTENTICACIÓN - Solo desarrollo */}
         <Route path="/debug" component={DebugPage} />
         <Route path="/user-debug" component={UserDebugPage} />
@@ -137,7 +141,21 @@ function App() {
             </OnboardingGuard>
           </ProtectedRoute>
         </Route>
-        {/* Agency Routes - Simplificadas a una sola página */}
+        {/* Agency Routes */}
+        <Route path="/users">
+          <ProtectedRoute>
+            <DashboardLayout>
+              <UsersPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/users/:id">
+          <ProtectedRoute>
+            <DashboardLayout>
+              <UserDetailPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        </Route>
         <Route path="/agency">
           <ProtectedRoute>
             <DashboardLayout>
@@ -152,6 +170,7 @@ function App() {
           </ProtectedRoute>
         </Route>
       </Router>
+    </OnboardingSyncProvider>
     </AuthProvider>
   );
 }

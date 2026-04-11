@@ -2,11 +2,14 @@
 
 export type UserRole = 'OWNER' | 'AGENCY' | 'ADMIN';
 
+export type AccountType = 'FREE' | 'PRO' | 'ENTERPRISE';
+
 export interface User {
   id: string;
   email: string;
   name: string;
   role: UserRole;
+  accountType: AccountType;
   integrations?: Array<{
     id: string;
     platform: string;
