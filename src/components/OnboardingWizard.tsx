@@ -47,7 +47,7 @@ export function OnboardingWizard() {
   const [connectionError, setConnectionError] = useState('');
 
   // Sync states - using new OnboardingSyncContext
-  const { state: syncState, startSync } = useOnboardingSync();
+  const { state: syncState, startSync, updateSyncProgress, completeSync } = useOnboardingSync();
   const { isBlocked, currentSync } = syncState;
 
   // Mutation for platform connection
@@ -55,10 +55,71 @@ export function OnboardingWizard() {
 
   // Auto-start sync when connection is successful
   useEffect(() => {
-    if (createdIntegration && !currentSync) {
-      startSync('stores', 4); // Start sync with 4 total steps
-    }
-  }, [createdIntegration, currentSync, startSync]);
+    let pollInterval: number | null = null;
+
+    const initiateSync = async () => {
+      if (createdIntegration && !currentSync && !pollInterval) {
+        try {
+          // Iniciar el sync en el backend
+          await fetch(`/api/delivery/${selectedPlatform}/sync/start`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+            },
+          });
+
+          // Iniciar el estado local del sync
+          startSync('stores', 4); // Start sync with 4 total steps
+
+          // Iniciar polling para obtener el progreso
+          pollInterval = setInterval(async () => {
+            try {
+              const response = await fetch(`/api/delivery/${selectedPlatform}/sync/progress`, {
+                headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                },
+              });
+              const progressData = await response.json();
+
+              if (progressData.steps) {
+                // Actualizar el estado del contexto basado en el progreso del backend
+                const completedSteps = progressData.steps.filter((s: any) => s.status === 'completed').length;
+                const inProgressStep = progressData.steps.find((s: any) => s.status === 'in_progress');
+
+                if (inProgressStep) {
+                  updateSyncProgress('stores', Math.round((inProgressStep.progress / inProgressStep.total) * 100));
+                }
+
+                if (completedSteps === progressData.steps.length) {
+                  completeSync('stores');
+                  if (pollInterval) {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('Error polling sync progress:', error);
+            }
+          }, 2000); // Poll every 2 seconds
+        } catch (error: any) {
+          console.error('Error starting sync:', error);
+          setConnectionError(error.message || 'Error al iniciar la sincronización');
+        }
+      }
+    };
+
+    initiateSync();
+
+    // Cleanup del intervalo cuando el componente se desmonta
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    };
+  }, [createdIntegration, currentSync, startSync, selectedPlatform, updateSyncProgress, completeSync]);
 
   // Navigate to next step when sync completes
   useEffect(() => {
