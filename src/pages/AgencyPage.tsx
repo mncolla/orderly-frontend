@@ -71,6 +71,7 @@ interface PlatformIntegration {
 interface StoreItem {
   id: string;
   itemId: string;
+  externalId: string;
   name: string;
   description: string | null;
   imageUrl: string | null;
@@ -372,6 +373,7 @@ export function AgencyPage() {
     return storeItemsData.store.storeItems.map((si: any) => ({
       id: si.id,
       itemId: si.itemId,
+      externalId: si.item.externalId,
       name: si.item.name,
       description: si.item.description,
       imageUrl: si.item.imageUrl,
@@ -444,16 +446,37 @@ export function AgencyPage() {
     // Get the StoreItem itemId from the selected item
     const selectedStoreItem = storeItems.find(item => item.id === formData.itemId);
     console.log('🎯 Selected StoreItem:', selectedStoreItem);
+    console.log('🎯 All storeItems:', storeItems);
 
     if (!selectedStoreItem) {
       console.log('❌ No StoreItem found for selected item');
       return [];
     }
 
+    console.log('🎯 Selected StoreItem structure:', {
+      id: selectedStoreItem.id,
+      itemId: selectedStoreItem.itemId,
+      externalId: selectedStoreItem.externalId,
+      name: selectedStoreItem.name,
+    });
+
     // Filter options that have a relation with this item
     const filtered = itemOptionsData.options.filter(option => {
+      console.log(`🔍 Checking option "${option.name}"`, {
+        optionId: option.id,
+        externalId: option.externalId,
+        hasRelations: !!option.itemRelations,
+        relationsCount: option.itemRelations?.length || 0,
+      });
+
       const hasRelation = option.itemRelations?.some(relation => {
-        if (relation.item?.externalId === selectedStoreItem.itemId) {
+        console.log(`🔍 Checking relation:`, {
+          relationItemExternalId: relation.item?.externalId,
+          selectedItemExternalId: selectedStoreItem.externalId,
+          match: relation.item?.externalId === selectedStoreItem.externalId,
+        });
+
+        if (relation.item?.externalId === selectedStoreItem.externalId) {
           console.log(`✅ Option "${option.name}" has relation with item "${selectedStoreItem.name}"`, {
             itemExternalId: selectedStoreItem.itemId,
             relationExternalId: relation.item?.externalId,
@@ -1160,17 +1183,23 @@ export function AgencyPage() {
                             Locales que comparten menú:
                           </div>
                           {menuGroup.allStores.map((store) => (
-                            <div
+                            <button
                               key={store.id}
-                              className={`px-3 py-2 rounded-lg text-sm ${
-                                store.id === menuGroup.representativeStore.id
+                              onClick={() => setSelectedStoreId(store.id)}
+                              className={`w-full px-3 py-2 rounded-lg text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2 ${
+                                store.id === selectedStoreId
                                   ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
                                   : 'text-gray-600 dark:text-gray-400'
                               }`}
                             >
-                              {store.name}
-                              {store.city && ` • ${store.city}`}
-                            </div>
+                              <div className="flex-1">
+                                {store.name}
+                                {store.city && ` • ${store.city}`}
+                              </div>
+                              {store.id === selectedStoreId && (
+                                <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                              )}
+                            </button>
                           ))}
                         </div>
                       )}
