@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { ChevronRight, ChevronLeft, Check, Store, Loader2, TrendingUp, UtensilsCrossed, ShoppingCart, Home, Settings, Target, BarChart3 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check, Store, Loader2, TrendingUp, UtensilsCrossed, ShoppingCart, Home, Settings, Target, BarChart3, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { platformIntegrationsService, type SyncProgress } from '../services/platformIntegrationsService';
 import { useConnectPedidosYa } from '../hooks/useIntegrations';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { OrganizationObjective } from '../types/organization';
 import { objectiveTypeLabels, objectiveUnitLabels, ObjectiveType, ObjectiveUnit } from '../types/organization';
 
@@ -52,6 +53,61 @@ export function OnboardingWizard() {
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [syncError, setSyncError] = useState('');
   const [isConnecting, setIsConnecting] = useState(false); // Mantener botón deshabilitado mientras se conecta o sincroniza
+  const [showSyncWarning, setShowSyncWarning] = useState(false); // Controlar el diálogo de advertencia de sincronización
+
+  // Efecto para recuperar estado de sincronización del localStorage al cargar el componente
+  useEffect(() => {
+    const savedSyncState = localStorage.getItem('onboarding_sync_state');
+    if (savedSyncState) {
+      try {
+        const state = JSON.parse(savedSyncState);
+        console.log('📋 Recuperando estado de sincronización del localStorage:', state);
+
+        // Verificar si el estado está expirado (más de 30 segundos)
+        const STATE_EXPIRY_TIME = 30 * 1000; // 30 segundos
+        const now = Date.now();
+        const isExpired = state.timestamp && (now - state.timestamp > STATE_EXPIRY_TIME);
+
+        if (isExpired) {
+          console.log('⏰ Estado de sincronización expirado, limpiando...');
+          localStorage.removeItem('onboarding_sync_state');
+          return; // No usar estado expirado
+        }
+
+        if (state.isSyncing) {
+          setIsSyncing(true);
+          setSyncStarted(true);
+          setIsConnecting(true);
+          if (state.syncProgress) {
+            setSyncProgress(state.syncProgress);
+          }
+        } else {
+          // Limpiar localStorage si no hay sincronización activa
+          localStorage.removeItem('onboarding_sync_state');
+        }
+      } catch (error) {
+        console.error('❌ Error al recuperar estado de sincronización:', error);
+        localStorage.removeItem('onboarding_sync_state'); // Limpiar si hay error
+      }
+    }
+  }, []); // Solo ejecutar una vez al montar el componente
+
+  // Efecto para guardar estado de sincronización en localStorage cuando cambia
+  useEffect(() => {
+    if (isSyncing && syncProgress) {
+      const state = {
+        isSyncing: true,
+        syncStarted: true,
+        syncProgress,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem('onboarding_sync_state', JSON.stringify(state));
+      console.log('💾 Guardando estado de sincronización en localStorage:', state);
+    } else if (!isSyncing) {
+      localStorage.removeItem('onboarding_sync_state');
+      console.log('🗑️ Limpiando estado de sincronización del localStorage');
+    }
+  }, [isSyncing, syncProgress]);
 
   // Mutation for platform connection
   const connectMutation = useConnectPedidosYa();
@@ -71,6 +127,9 @@ export function OnboardingWizard() {
         if (result.status === 'no_sync_in_progress') {
           console.log('❌ No sync in progress, stopping polling');
           setIsSyncing(false);
+          setSyncStarted(false);
+          setIsConnecting(false);
+          localStorage.removeItem('onboarding_sync_state'); // ✅ Limpiar localStorage
           return;
         }
 
@@ -84,6 +143,8 @@ export function OnboardingWizard() {
             setIsSyncing(false);
             setSyncStarted(false);
             setIsConnecting(false); // Habilitar botón cuando se completa la sincronización
+            setShowSyncWarning(false); // Cerrar el diálogo de advertencia si está abierto
+            localStorage.removeItem('onboarding_sync_state'); // ✅ Limpiar localStorage cuando termina
             setTimeout(() => {
               setCurrentStep('defaultConfig');
             }, 1000);
@@ -138,7 +199,7 @@ export function OnboardingWizard() {
   // Objectives (Step 4)
   const [objectives, setObjectives] = useState<Array<OrganizationObjective & { id: string }>>([]);
 
-  const handleConnectPlatform = async (e: React.FormEvent) => {
+  const handleConnectPlatform = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setConnectionError('');
     setIsLoading(true);
@@ -165,7 +226,7 @@ export function OnboardingWizard() {
     }
   };
 
-  const handleVerifyOTP = async (e: React.FormEvent) => {
+  const handleVerifyOTP = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setConnectionError('');
     setIsLoading(true);
@@ -202,12 +263,25 @@ export function OnboardingWizard() {
       console.log('📡 Calling startSegmentedSync...');
       const result = await platformIntegrationsService.startSegmentedSync(selectedPlatform);
       console.log('✅ startSegmentedSync result:', result);
+
+      // Guardar estado inicial en localStorage para persistencia
+      if (result.progress) {
+        const state = {
+          isSyncing: true,
+          syncStarted: true,
+          syncProgress: result.progress,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem('onboarding_sync_state', JSON.stringify(state));
+        console.log('💾 Estado inicial de sincronización guardado en localStorage:', state);
+      }
     } catch (error: any) {
       console.error('❌ Error in handleStartSync:', error);
       setSyncError(error.message || 'Error al iniciar la sincronización');
       setIsSyncing(false);
       setSyncStarted(false);
       setIsConnecting(false); // Habilitar botón si hay error
+      localStorage.removeItem('onboarding_sync_state'); // ✅ Limpiar localStorage si hay error
     }
   };
 
@@ -229,39 +303,73 @@ export function OnboardingWizard() {
   };
 
   const handleCompleteOnboarding = async () => {
+    // Permitir completar onboarding aunque la sincronización esté en progreso
+    console.log('🎯 handleCompleteOnboarding llamado. Estado:', { isSyncing, currentStep });
+
+    // NOTA: Ya NO bloqueamos el onboarding si está sincronizando.
+    // El modal se mostrará en /overview mientras el sync continúa en segundo plano.
+
+    console.log('✅ Completando onboarding. La sincronización continuará en segundo plano.');
     setIsLoading(true);
     try {
-      // Save default config
-      await fetch('/api/business-config', {
+      console.log('🚀 Completando onboarding...');
+
+      // Obtener el ID de la integración creada
+      if (!createdIntegration?.id) {
+        throw new Error('No hay integración creada');
+      }
+
+      // Preparar datos según el formato esperado por el backend
+      const costs = {
+        platformCommission: defaultConfig.platformCommission,
+        markup: defaultConfig.markupPercentage, // El backend espera "markup", no "markupPercentage"
+        costOfGoods: defaultConfig.costOfGoods,
+        fixedCosts: 0, // Default value
+        packagingCost: 0, // Default value
+        deliveryCost: 0, // Default value
+      };
+
+      // Preparar configuraciones de stores (solo stores con config personalizado)
+      const storeConfigs = storesWithConfig
+        .filter(store => store.useCustomConfig && store.config)
+        .map(store => ({
+          storeId: store.id,
+          platformCommission: store.config?.platformCommission,
+          markup: store.config?.markupPercentage, // El backend espera "markup", no "markupPercentage"
+          costOfGoods: store.config?.costOfGoods,
+          fixedCosts: store.config?.fixedMonthlyCosts || 0, // El backend espera "fixedCosts", no "fixedMonthlyCosts"
+          packagingCost: store.config?.packagingCost || 0,
+          deliveryCost: store.config?.deliveryCost || 0,
+        }));
+
+      console.log('💾 Llamando endpoint de onboarding...');
+      console.log('💾 Costs:', costs);
+      console.log('💾 StoreConfigs:', storeConfigs);
+      console.log('💾 Objectives:', objectives);
+
+      const response = await fetch(`/api/platform-integrations/${createdIntegration.id}/onboarding`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` },
-        body: JSON.stringify(defaultConfig),
+        body: JSON.stringify({
+          costs,
+          objectives,
+          storeConfigs,
+        }),
       });
 
-      // Save store configs
-      for (const store of storesWithConfig) {
-        if (store.useCustomConfig && store.config) {
-          await fetch(`/api/stores/${store.id}/config`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` },
-            body: JSON.stringify(store.config),
-          });
-        }
+      if (!response.ok) {
+        throw new Error(`Error al completar onboarding: ${response.status}`);
       }
 
-      // Save objectives
-      for (const objective of objectives) {
-        await fetch('/api/objectives', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` },
-          body: JSON.stringify(objective),
-        });
-      }
+      console.log('✅ Onboarding completado exitosamente');
 
+      // Refresh user and navigate
+      console.log('🔄 Actualizando usuario y navegando...');
       await refetchUser();
       navigate('/overview');
     } catch (error: any) {
-      console.error('Error completing onboarding:', error);
+      console.error('❌ Error completando onboarding:', error);
+      alert(`Error al completar el onboarding: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -492,14 +600,28 @@ export function OnboardingWizard() {
 
               {/* Success message when connection is established */}
               {createdIntegration && !isSyncing && (
-                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-xl space-y-3">
                   <Check className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
                   <p className="font-semibold text-green-900 dark:text-green-100">
                     ¡Conexión exitosa con PedidosYa!
                   </p>
-                  <p className="text-sm text-green-700 dark:text-green-200 mt-1">
+                  <p className="text-sm text-green-700 dark:text-green-200">
                     Cuenta conectada: {createdIntegration.email}
                   </p>
+                  {createdIntegration.stores && createdIntegration.stores.length > 0 && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-green-700 dark:text-green-200">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>
+                        Hemos detectado {createdIntegration.stores.length} {createdIntegration.stores.length === 1 ? 'local' : 'locales'} y estamos sincronizando la información
+                      </span>
+                    </div>
+                  )}
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg mt-2">
+                    <p className="text-xs text-blue-800 dark:text-blue-200 font-medium">
+                      📝 Importante: Puedes continuar con la creación de tu cuenta.
+                      Te avisaremos cuando termine la sincronización de tus datos.
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -579,13 +701,6 @@ export function OnboardingWizard() {
               {syncError && (
                 <div className="p-3 sm:p-4 text-sm text-red-800 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-800">
                   {syncError}
-                </div>
-              )}
-
-              {syncProgress?.steps.every(s => s.status === 'completed') && (
-                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                  <Check className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
-                  <p className="font-semibold text-green-900 dark:text-green-100">¡Sincronización completada!</p>
                 </div>
               )}
             </div>
@@ -882,6 +997,78 @@ export function OnboardingWizard() {
           )}
         </div>
       </div>
+
+      {/* Sync Warning Dialog */}
+      <Dialog open={showSyncWarning} onOpenChange={setShowSyncWarning}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-600" />
+              <span>Sincronización en progreso</span>
+            </DialogTitle>
+            <DialogDescription>
+              Aún estamos sincronizando tus datos de PedidosYa.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Mostrar el progreso actual de sincronización */}
+          {syncProgress && (
+            <div className="space-y-4 py-4">
+              {syncProgress.steps.map((step, idx) => {
+                const StepIcon = step.step === 'stores' ? Store :
+                                step.step === 'menu' ? UtensilsCrossed : ShoppingCart;
+
+                return (
+                  <div key={idx} className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${
+                      step.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30' :
+                      step.status === 'in_progress' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                      'bg-gray-100 dark:bg-gray-700'
+                    }`}>
+                      {step.status === 'completed' ? (
+                        <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      ) : step.status === 'in_progress' ? (
+                        <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin" />
+                      ) : (
+                        <StepIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                      )}
+                    </div>
+
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium">
+                          {step.step === 'stores' ? 'Locales' :
+                           step.step === 'menu' ? 'Menú' : 'Órdenes'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {step.progress}/{step.total}
+                        </span>
+                      </div>
+
+                      {(step.status === 'in_progress' || step.status === 'completed') && (
+                        <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all ${
+                              step.status === 'completed' ? 'bg-green-500' : 'bg-blue-500'
+                            }`}
+                            style={{ width: `${(step.progress / step.total) * 100}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="p-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+              Por favor espera a que se complete la sincronización antes de continuar.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -40,15 +40,68 @@ export function OnboardingSyncProvider({ children }: { children: ReactNode }) {
     const loadState = () => {
       try {
         const stored = localStorage.getItem(SYNC_STORAGE_KEY);
+        console.log('🔄 OnboardingSyncContext - loadState called, stored:', stored);
+
         if (stored) {
           const parsed = JSON.parse(stored);
-          setCurrentSync(parsed.currentSync);
+          console.log('🔄 OnboardingSyncContext - parsed:', parsed);
 
-          // Si hay un sync en progreso y pasó el tiempo, desbloquear
-          if (parsed.currentSync?.status === 'in_progress') {
-            const syncAge = Date.now() - new Date(parsed.currentSync.timestamp || 0).getTime();
-            if (syncAge > SYNC_BLOCK_DURATION) {
-              setIsBlocked(false);
+          // Leer estructura del OnboardingWizard (syncProgress)
+          if (parsed.syncProgress && parsed.isSyncing) {
+            const progress = parsed.syncProgress;
+            const steps = progress.steps || [];
+            const currentStepIndex = progress.currentStep;
+            const currentStepData = steps[currentStepIndex];
+
+            console.log('🔄 OnboardingSyncContext - syncProgress detected:', { progress, currentStepData });
+
+            // Calcular progreso global
+            const globalProgress = Math.round(
+              ((currentStepIndex + (currentStepData?.progress || 0) / (currentStepData?.total || 1)) /
+                (progress.totalSteps || 1)) * 100
+            );
+
+            // Transformar a la estructura que espera el modal
+            const currentSync: SyncStepInfo | null = currentStepData
+              ? {
+                  step: 'connection', // Usamos connection genéricamente para el sync global
+                  status: currentStepData.status === 'failed'
+                    ? 'error'
+                    : currentStepData.status === 'completed'
+                    ? 'completed'
+                    : 'in_progress',
+                  progress: globalProgress,
+                  total: 100,
+                  name: 'Sincronizando datos',
+                  description: `${currentStepData.message || 'Sincronizando...'} (${globalProgress}%)`,
+                  timestamp: parsed.timestamp || Date.now(),
+                }
+              : null;
+
+            console.log('🔄 OnboardingSyncContext - setting currentSync:', currentSync);
+
+            setCurrentSync(currentSync);
+            setIsBlocked(parsed.isSyncing);
+
+            // Si hay un sync en progreso y pasó el tiempo, desbloquear
+            if (currentSync?.status === 'in_progress') {
+              const syncAge = Date.now() - (parsed.timestamp || 0);
+              if (syncAge > SYNC_BLOCK_DURATION) {
+                setIsBlocked(false);
+              }
+            }
+          }
+          // Leer estructura propia (currentSync)
+          else if (parsed.currentSync) {
+            setCurrentSync(parsed.currentSync);
+            setIsBlocked(parsed.isBlocked);
+
+            // Si hay un sync en progreso y pasó el tiempo, desbloquear
+            if (parsed.currentSync?.status === 'in_progress') {
+              const syncAge = Date.now() - new Date(parsed.currentSync.timestamp || 0).getTime();
+              if (syncAge > SYNC_BLOCK_DURATION) {
+                setIsBlocked(false);
+              }
             }
           }
         }
@@ -65,9 +118,15 @@ export function OnboardingSyncProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    // Polling para detectar cambios en la misma pestaña
+    const pollingInterval = setInterval(() => {
+      loadState();
+    }, 2000); // Poll cada 2 segundos
+
     window.addEventListener('storage', handleStorageChange);
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      clearInterval(pollingInterval);
     };
   }, []);
 
