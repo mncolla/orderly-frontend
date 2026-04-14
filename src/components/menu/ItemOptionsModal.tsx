@@ -133,7 +133,7 @@ export function ItemOptionsModal({
 }: ItemOptionsModalProps) {
   const [selectedOption, setSelectedOption] = useState<ItemOption | null>(null);
 
-  // Fetch all options for the store
+  // Fetch all options for store
   const { data: optionsData, isLoading } = useQuery({
     queryKey: ['item-options', storeId],
     queryFn: () => itemOptionsService.getOptions(storeId),
@@ -150,7 +150,7 @@ export function ItemOptionsModal({
   const totalOptions = itemOptions.length;
   const totalValues = useMemo(() =>
     itemOptions.reduce((sum, opt) => sum + opt.values.length, 0),
-  [itemOptions]
+    [itemOptions]
   );
 
   const handleToggleOption = useCallback((option: ItemOption) => {

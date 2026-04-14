@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { CheckCircle, XCircle, Clock, Sparkles, Edit3, Store, Zap, Package, Star, Settings, Loader2, Save, BarChart3, Activity, ExternalLink, Calendar, Music, Trophy, PartyPopper } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Sparkles, Edit3, Store, Zap, Package, Star, Settings, Loader2, Save, BarChart3, Activity, ExternalLink, Calendar, Music, Trophy, PartyPopper, ChevronDown, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -125,6 +125,8 @@ export function AgencyPage() {
 
   // Form state
   const [selectedType, setSelectedType] = useState<SuggestionType>('ITEM_IMPROVEMENT');
+  const [editingOptions, setEditingOptions] = useState<Record<string, any>>({});
+  const [expandedOptions, setExpandedOptions] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState({
     itemId: '',
     newDescription: '',
@@ -557,9 +559,15 @@ export function AgencyPage() {
           proposedDescription: formData.newDescription || undefined,
           proposedImageUrl: formData.newImageUrl || undefined,
           proposedPrice: formData.newPriceImprovement ? parseFloat(formData.newPriceImprovement) : undefined,
+          itemOptions: Object.values(editingOptions).length > 0 ? Object.values(editingOptions) : undefined,
         };
         title = `Improve: ${selectedItem?.name}`;
-        description = formData.newDescription || 'Update item presentation';
+        const itemOptionsCount = Object.values(editingOptions).length;
+        const totalValuesModified = Object.values(editingOptions).reduce(
+          (sum, opt) => sum + Object.keys(opt.values || {}).length, 0
+        );
+        description = formData.newDescription ||
+          `Update item presentation${itemOptionsCount > 0 ? ` and ${itemOptionsCount} option${itemOptionsCount !== 1 ? 's' : ''} (${totalValuesModified} value${totalValuesModified !== 1 ? 's' : ''})` : ''}`;
         break;
 
       case 'PEDIDOS_YA_DESCUENTO_FUGAZ':
@@ -821,19 +829,196 @@ export function AgencyPage() {
                   Item Options ({itemOptions.length})
                 </h4>
                 <div className="space-y-2">
-                  {itemOptions.slice(0, 5).map((option) => (
-                    <div key={option.id} className="text-xs bg-white dark:bg-gray-800 p-2 rounded border border-blue-100 dark:border-blue-900">
-                      <div className="font-medium text-gray-900 dark:text-white">{option.name}</div>
-                      <div className="text-gray-600 dark:text-gray-400 mt-1">
-                        {option.values.slice(0, 3).map((v) => (
-                          <span key={v.id} className="inline-block mr-2">
-                            {v.name} (${v.unitPrice})
-                          </span>
-                        ))}
-                        {option.values.length > 3 && <span>+{option.values.length - 3} more</span>}
+                  {itemOptions.map((option) => {
+                    const isExpanded = expandedOptions.has(option.id);
+                    const editingOption = editingOptions[option.id] || {};
+                    const editingValues = editingOption.values || {};
+
+                    return (
+                      <div key={option.id} className="bg-white dark:bg-gray-800 rounded border border-blue-100 dark:border-blue-900">
+                        {/* Option Header */}
+                        <button
+                          onClick={() => {
+                            setExpandedOptions(prev => {
+                              const newSet = new Set(prev);
+                              if (newSet.has(option.id)) {
+                                newSet.delete(option.id);
+                              } else {
+                                newSet.add(option.id);
+                              }
+                              return newSet;
+                            });
+                          }}
+                          className="w-full px-3 py-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                        >
+                          <div className="flex-1">
+                            <div className="font-medium text-sm text-gray-900 dark:text-white">
+                              {option.name}
+                            </div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                              {option.values.length} valor{option.values.length !== 1 ? 'es' : ''}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {option.type === 'CHOICES' ? 'Elección' : 'Bundle'}
+                            </span>
+                            {isExpanded ? (
+                              <X className="h-4 w-4 text-gray-500" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-gray-500" />
+                            )}
+                          </div>
+                        </button>
+
+                        {/* Option Content */}
+                        {isExpanded && (
+                          <div className="border-t border-gray-200 dark:border-gray-700 p-3 space-y-3">
+                            {/* Option Name Edit */}
+                            <div>
+                              <Label className="text-xs font-medium">Nombre de la Opción</Label>
+                              <Input
+                                value={editingOption.name !== undefined ? editingOption.name : option.name}
+                                onChange={(e) => {
+                                  setEditingOptions(prev => ({
+                                    ...prev,
+                                    [option.id]: {
+                                      ...prev[option.id],
+                                      optionId: option.id,
+                                      name: e.target.value,
+                                      values: prev[option.id]?.values || {},
+                                    },
+                                  }));
+                                }}
+                                className="mt-1"
+                                placeholder="Nombre de la opción"
+                              />
+                            </div>
+
+                            {/* Option Values */}
+                            <div className="space-y-2">
+                              <Label className="text-xs font-medium">Valores</Label>
+                              {option.values.map((value) => {
+                                const editingValue = editingValues[value.id] || {};
+
+                                return (
+                                  <div key={value.id} className="border border-gray-200 dark:border-gray-700 rounded p-2 space-y-2">
+                                    {/* Value Name Edit */}
+                                    <div>
+                                      <Label className="text-xs text-gray-600">Nombre del Valor</Label>
+                                      <Input
+                                        value={editingValue.name !== undefined ? editingValue.name : value.name}
+                                        onChange={(e) => {
+                                          setEditingOptions(prev => ({
+                                            ...prev,
+                                            [option.id]: {
+                                              ...prev[option.id],
+                                              optionId: option.id,
+                                              values: {
+                                                ...prev[option.id]?.values,
+                                                [value.id]: {
+                                                  ...prev[option.id]?.values?.[value.id],
+                                                  name: e.target.value,
+                                                },
+                                              },
+                                            },
+                                          }));
+                                        }}
+                                        className="mt-1 text-sm"
+                                        placeholder="Nombre del valor"
+                                      />
+                                    </div>
+
+                                    {/* Value Price Edit */}
+                                    <div>
+                                      <Label className="text-xs text-gray-600">Precio</Label>
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={editingValue.unitPrice !== undefined ? editingValue.unitPrice : String(value.unitPrice)}
+                                        onChange={(e) => {
+                                          setEditingOptions(prev => ({
+                                            ...prev,
+                                            [option.id]: {
+                                              ...prev[option.id],
+                                              optionId: option.id,
+                                              values: {
+                                                ...prev[option.id]?.values,
+                                                [value.id]: {
+                                                  ...prev[option.id]?.values?.[value.id],
+                                                  unitPrice: parseFloat(e.target.value) || 0,
+                                                },
+                                              },
+                                            },
+                                          }));
+                                        }}
+                                        className="mt-1 text-sm"
+                                        placeholder="Precio"
+                                      />
+                                    </div>
+
+                                    {/* Value Available Toggle */}
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        id={`available-${value.id}`}
+                                        checked={editingValue.available !== undefined ? editingValue.available : value.available}
+                                        onChange={(e) => {
+                                          setEditingOptions(prev => ({
+                                            ...prev,
+                                            [option.id]: {
+                                              ...prev[option.id],
+                                              optionId: option.id,
+                                              values: {
+                                                ...prev[option.id]?.values,
+                                                [value.id]: {
+                                                  ...prev[option.id]?.values?.[value.id],
+                                                  available: e.target.checked,
+                                                },
+                                              },
+                                            },
+                                          }));
+                                        }}
+                                        className="w-4 h-4"
+                                      />
+                                      <label htmlFor={`available-${value.id}`} className="text-xs text-gray-600">
+                                        Disponible
+                                      </label>
+                                    </div>
+
+                                    {/* Reset Changes Button */}
+                                    {Object.keys(editingValue).length > 0 && (
+                                      <button
+                                        onClick={() => {
+                                          setEditingOptions(prev => {
+                                            const newOptions = { ...prev };
+                                            const newValues = { ...newOptions[option.id]?.values };
+                                            delete newValues[value.id];
+                                            if (Object.keys(newValues).length === 0) {
+                                              delete newOptions[option.id];
+                                            } else {
+                                              newOptions[option.id] = {
+                                                ...newOptions[option.id],
+                                                values: newValues,
+                                              };
+                                            }
+                                            return newOptions;
+                                          });
+                                        }}
+                                        className="text-xs text-red-600 hover:text-red-700"
+                                      >
+                                        Restaurar original
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1094,6 +1279,21 @@ export function AgencyPage() {
                         setSelectedUserId(user.id);
                         setUserSearchQuery(user.name);
                         setShowUserDropdown(false);
+                        // Limpiar campos de sugerencia al cambiar de usuario
+                        setFormData({
+                          itemId: '',
+                          newDescription: '',
+                          newImageUrl: '',
+                          newPriceImprovement: '',
+                          reason: '',
+                          discountType: 'PERCENTAGE',
+                          discountValue: '',
+                          promotionStart: '',
+                          promotionEnd: '',
+                        });
+                        // Limpiar estado de edición de opciones
+                        setEditingOptions({});
+                        setExpandedOptions(new Set());
                       }}
                       className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-b-0"
                     >
@@ -1135,7 +1335,24 @@ export function AgencyPage() {
                     <div key={menuGroup.vendorGroupId} className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
                       {/* Menu Group - Selectable */}
                       <button
-                        onClick={() => setSelectedStoreId(menuGroup.representativeStore.id)}
+                        onClick={() => {
+                          setSelectedStoreId(menuGroup.representativeStore.id);
+                          // Limpiar campos de sugerencia al cambiar de store
+                          setFormData({
+                            itemId: '',
+                            newDescription: '',
+                            newImageUrl: '',
+                            newPriceImprovement: '',
+                            reason: '',
+                            discountType: 'PERCENTAGE',
+                            discountValue: '',
+                            promotionStart: '',
+                            promotionEnd: '',
+                          });
+                          // Limpiar estado de edición de opciones
+                          setEditingOptions({});
+                          setExpandedOptions(new Set());
+                        }}
                         className="w-full bg-gray-50 dark:bg-gray-800 px-4 py-3 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       >
                         <div className="flex items-center gap-3 flex-1">
@@ -1185,7 +1402,24 @@ export function AgencyPage() {
                           {menuGroup.allStores.map((store) => (
                             <button
                               key={store.id}
-                              onClick={() => setSelectedStoreId(store.id)}
+                              onClick={() => {
+                                setSelectedStoreId(store.id);
+                                // Limpiar campos de sugerencia al cambiar de store
+                                setFormData({
+                                  itemId: '',
+                                  newDescription: '',
+                                  newImageUrl: '',
+                                  newPriceImprovement: '',
+                                  reason: '',
+                                  discountType: 'PERCENTAGE',
+                                  discountValue: '',
+                                  promotionStart: '',
+                                  promotionEnd: '',
+                                });
+                                // Limpiar estado de edición de opciones
+                                setEditingOptions({});
+                                setExpandedOptions(new Set());
+                              }}
                               className={`w-full px-3 py-2 rounded-lg text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2 ${
                                 store.id === selectedStoreId
                                   ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
