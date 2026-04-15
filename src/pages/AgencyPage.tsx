@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { CheckCircle, XCircle, Clock, Sparkles, Edit3, Store, Zap, Package, Star, Settings, Loader2, Save, BarChart3, Activity, ExternalLink, Calendar, Music, Trophy, PartyPopper, ChevronDown, X, ChevronUp } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Sparkles, Edit3, Store, Zap, Package, Star, Settings, Loader2, Save, BarChart3, Activity, ExternalLink, Calendar, Music, Trophy, PartyPopper, ChevronDown, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
