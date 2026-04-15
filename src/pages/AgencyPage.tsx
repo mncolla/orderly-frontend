@@ -878,7 +878,7 @@ export function AgencyPage() {
                             <div>
                               <Label className="text-xs font-medium">Nombre de la Opción</Label>
                               <Input
-                                value={editingOption.name !== undefined ? editingOption.name : option.name}
+                                value={option.name}
                                 onChange={(e) => {
                                   setEditingOptions(prev => ({
                                     ...prev,
@@ -914,6 +914,7 @@ export function AgencyPage() {
                                             [option.id]: {
                                               ...prev[option.id],
                                               optionId: option.id,
+                                              name: prev[option.id]?.name || option.name,
                                               values: {
                                                 ...prev[option.id]?.values,
                                                 [value.id]: {
@@ -942,6 +943,7 @@ export function AgencyPage() {
                                             [option.id]: {
                                               ...prev[option.id],
                                               optionId: option.id,
+                                              name: prev[option.id]?.name || option.name,
                                               values: {
                                                 ...prev[option.id]?.values,
                                                 [value.id]: {
@@ -969,6 +971,7 @@ export function AgencyPage() {
                                             [option.id]: {
                                               ...prev[option.id],
                                               optionId: option.id,
+                                              name: prev[option.id]?.name || option.name,
                                               values: {
                                                 ...prev[option.id]?.values,
                                                 [value.id]: {
