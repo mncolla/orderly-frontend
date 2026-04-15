@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
 import { storesService } from '../services/storesService';
 import { eventsService } from '../services/eventsService';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { CheckCircle, XCircle, Clock, Sparkles, Edit3, Store, Zap, Package, Star, Settings, Loader2, Save, BarChart3, Activity, ExternalLink, Calendar, Music, Trophy, PartyPopper, ChevronDown, X } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Sparkles, Edit3, Store, Zap, Package, Star, Settings, Loader2, Save, BarChart3, Activity, ExternalLink, Calendar, Music, Trophy, PartyPopper, ChevronDown, X, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -370,6 +370,16 @@ export function AgencyPage() {
     enabled: !!selectedStoreId,
   });
 
+  // Query to fetch all item options for the store
+  const { data: allItemOptionsData } = useQuery({
+    queryKey: ['store-options', selectedStoreId],
+    queryFn: async () => {
+      if (!selectedStoreId) return null;
+      return await storesService.getOptions(selectedStoreId);
+    },
+    enabled: !!selectedStoreId,
+  });
+
   const storeItems: StoreItem[] = useMemo(() => {
     if (!storeItemsData?.store?.storeItems) return [];
     return storeItemsData.store.storeItems.map((si: any) => ({
@@ -384,6 +394,42 @@ export function AgencyPage() {
       price: typeof si.price === 'string' ? parseFloat(si.price) : (si.price || 0),
     }));
   }, [storeItemsData]);
+
+  // Count options per item
+  const itemOptionsCount = useMemo(() => {
+    if (!allItemOptionsData?.options) return {};
+    const count: Record<string, number> = {};
+
+    allItemOptionsData.options.forEach((option: any) => {
+      if (option.itemRelations && option.itemRelations.length > 0) {
+        option.itemRelations.forEach((relation: any) => {
+          const itemId = relation.item?.id;
+          if (itemId && count[itemId] === undefined) {
+            count[itemId] = 0;
+          }
+          if (itemId && count[itemId] !== undefined) {
+            count[itemId] = (count[itemId] || 0) + 1;
+          }
+        });
+      }
+    });
+
+    return count;
+  }, [allItemOptionsData]);
+
+  // Count items linked to each option
+  const optionItemsCount = useMemo(() => {
+    if (!allItemOptionsData?.options) return {};
+    const count: Record<string, number> = {};
+
+    allItemOptionsData.options.forEach((option: any) => {
+      if (option.itemRelations && option.itemRelations.length > 0) {
+        count[option.id] = option.itemRelations.length;
+      }
+    });
+
+    return count;
+  }, [allItemOptionsData]);
 
   // Group items by category
   const itemsByCategory = useMemo(() => {
@@ -427,15 +473,26 @@ export function AgencyPage() {
     return storeItems.find(item => item.id === formData.itemId) || null;
   }, [formData.itemId, storeItems]);
 
-  // Query to fetch options for the selected item
+  // Query to fetch all item options for the selected store
+  const queryClient = useQueryClient();
+
   const { data: itemOptionsData } = useQuery({
-    queryKey: ['item-options', selectedStoreId, formData.itemId],
+    queryKey: ['store-options', selectedStoreId],
     queryFn: async () => {
-      if (!selectedStoreId || !formData.itemId) return null;
+      if (!selectedStoreId) return null;
+      console.log('🔄 Fetching item options for store:', selectedStoreId);
       return await storesService.getOptions(selectedStoreId);
     },
-    enabled: !!selectedStoreId && !!formData.itemId,
+    enabled: !!selectedStoreId,
   });
+
+  // Invalidate cache when store changes
+  useEffect(() => {
+    if (selectedStoreId) {
+      console.log('🔄 Invalidating store-options cache for store:', selectedStoreId);
+      queryClient.invalidateQueries({ queryKey: ['store-options', selectedStoreId] });
+    }
+  }, [selectedStoreId, queryClient]);
 
   // Filter options to only show those related to the selected item
   const itemOptions = useMemo(() => {
@@ -473,15 +530,15 @@ export function AgencyPage() {
 
       const hasRelation = option.itemRelations?.some(relation => {
         console.log(`🔍 Checking relation:`, {
-          relationItemExternalId: relation.item?.externalId,
-          selectedItemExternalId: selectedStoreItem.externalId,
-          match: relation.item?.externalId === selectedStoreItem.externalId,
+          relationItemId: relation.item?.id,
+          selectedItemId: selectedStoreItem.itemId,
+          match: relation.item?.id === selectedStoreItem.itemId,
         });
 
-        if (relation.item?.externalId === selectedStoreItem.externalId) {
+        if (relation.item?.id === selectedStoreItem.itemId) {
           console.log(`✅ Option "${option.name}" has relation with item "${selectedStoreItem.name}"`, {
-            itemExternalId: selectedStoreItem.itemId,
-            relationExternalId: relation.item?.externalId,
+            itemId: selectedStoreItem.itemId,
+            relationItemId: relation.item?.id,
           });
           return true;
         }
@@ -787,30 +844,39 @@ export function AgencyPage() {
                     <div key={category.categoryName}>
                       {/* Category header */}
                       <div
-                        className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 sticky top-0"
+                        className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 sticky top-0 z-10"
                       >
                         📁 {category.categoryName} ({category.items.length})
                       </div>
                       {/* Items in this category */}
                       {category.items.map((item: StoreItem) => (
                         <SelectItem key={item.id} value={item.id}>
-                          <div className="flex items-center gap-3 py-1">
-                            {/* Thumbnail */}
-                            {item.imageUrl ? (
-                              <img
-                                src={item.imageUrl}
-                                alt={item.name}
-                                className="w-10 h-10 object-cover rounded flex-shrink-0"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center flex-shrink-0">
-                                <span className="text-xs text-gray-400">📷</span>
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm truncate">{item.name}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                ${item.price.toFixed(2)}
+                          <div className="flex items-center gap-3 py-1 w-full justify-between">
+                            <div className="flex items-center gap-3 flex-1">
+                              {/* Thumbnail */}
+                              {item.imageUrl ? (
+                                <img
+                                  src={item.imageUrl}
+                                  alt={item.name}
+                                  className="w-10 h-10 object-cover rounded flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center flex-shrink-0">
+                                  <span className="text-xs text-gray-400">📷</span>
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm truncate flex items-center justify-between gap-2">
+                                  <span>{item.name}</span>
+                                  {itemOptionsCount[item.itemId] > 0 && (
+                                    <span className="text-xs text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap">
+                                      ({itemOptionsCount[item.itemId]}) opciones
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 text-left">
+                                  ${item.price.toFixed(2)}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -856,6 +922,16 @@ export function AgencyPage() {
                               {option.name}
                             </div>
                             <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                              {optionItemsCount[option.id] > 1 ? (
+                                <span className="text-amber-600 dark:text-amber-400 font-medium">
+                                  ⚠️ Usado en {optionItemsCount[option.id]} items
+                                </span>
+                              ) : optionItemsCount[option.id] === 1 ? (
+                                <span className="text-green-600 dark:text-green-400 font-medium">
+                                  ✓ Usado solo en este item
+                                </span>
+                              ) : null}
+                              {optionItemsCount[option.id] > 0 && ' • '}
                               {option.values.length} valor{option.values.length !== 1 ? 'es' : ''}
                             </div>
                           </div>
@@ -864,7 +940,7 @@ export function AgencyPage() {
                               {option.type === 'CHOICES' ? 'Elección' : 'Bundle'}
                             </span>
                             {isExpanded ? (
-                              <X className="h-4 w-4 text-gray-500" />
+                              <ChevronUp className="h-4 w-4 text-gray-500" />
                             ) : (
                               <ChevronDown className="h-4 w-4 text-gray-500" />
                             )}
@@ -1142,7 +1218,17 @@ export function AgencyPage() {
                 <SelectContent>
                   {storeItems.map((item: StoreItem) => (
                     <SelectItem key={item.id} value={item.id}>
-                      {item.name} - ${item.price}
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="truncate">{item.name}</span>
+                          <span className="text-gray-500 text-xs">${item.price.toFixed(2)}</span>
+                        </div>
+                        {itemOptionsCount[item.itemId] > 0 && (
+                          <span className="text-xs text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap">
+                            ({itemOptionsCount[item.itemId]}) opciones
+                          </span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1219,7 +1305,17 @@ export function AgencyPage() {
                 <SelectContent>
                   {storeItems.map((item: StoreItem) => (
                     <SelectItem key={item.id} value={item.id}>
-                      {item.name} - ${item.price}
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="truncate">{item.name}</span>
+                          <span className="text-gray-500 text-xs">${item.price.toFixed(2)}</span>
+                        </div>
+                        {itemOptionsCount[item.itemId] > 0 && (
+                          <span className="text-xs text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap">
+                            ({itemOptionsCount[item.itemId]}) opciones
+                          </span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
