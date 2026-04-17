@@ -10,6 +10,7 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import DebugPage from './pages/DebugPage';
 import UserDebugPage from './pages/UserDebugPage';
+import PedidosYaDebugPage from './pages/PedidosYaDebugPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { OperationsPage } from './pages/OperationsPage';
 import { MenuPage } from './pages/MenuPage';
@@ -61,6 +62,7 @@ function App() {
         {/* Debug routes - SIN AUTENTICACIÓN - Solo desarrollo */}
         <Route path="/debug" component={DebugPage} />
         <Route path="/user-debug" component={UserDebugPage} />
+        <Route path="/pedidosya-debug" component={PedidosYaDebugPage} />
 
         <Route path="/login" component={LoginPage} />
         <Route path="/signup" component={SignupPage} />
