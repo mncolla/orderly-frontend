@@ -1,5 +1,6 @@
 import { Loader2, Lock, AlertCircle, CheckCircle } from 'lucide-react';
 import { useOnboardingSync } from '@/contexts/OnboardingSyncContext';
+import { useLocation } from 'wouter';
 import {
   Dialog,
   DialogContent,
@@ -11,8 +12,11 @@ import {
 export function OnboardingSyncModal() {
   const { state, unblock } = useOnboardingSync();
   const { isBlocked, currentSync } = state;
+  const [location] = useLocation();
 
-  if (!currentSync) {
+  // Don't show modal on onboarding page or auth pages
+  const excludedRoutes = ['/onboarding', '/login', '/signup'];
+  if (!currentSync || excludedRoutes.includes(location)) {
     return null;
   }
 

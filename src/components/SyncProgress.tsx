@@ -1,4 +1,4 @@
-import { Home, UtensilsCrossed, ShoppingCart, Check, Loader2 } from 'lucide-react';
+import { Home, UtensilsCrossed, ShoppingCart, Check, Loader2, Calendar, Store } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import type { SyncProgress } from '../services/platformIntegrationsService';
 
@@ -83,6 +83,51 @@ export function SyncProgressDisplay({ syncProgress, syncError }: SyncProgressDis
                       <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                         {step.message}
                       </p>
+                    )}
+
+                    {/* Orders details - show by month and store */}
+                    {step.step === 'orders' && step.details && (
+                      <div className="mt-3 space-y-2">
+                        {/* Orders by month */}
+                        {step.details.ordersByMonth && step.details.ordersByMonth.length > 0 && (
+                          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Calendar className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                Órdenes por mes
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              {step.details.ordersByMonth.map((item, index) => (
+                                <div key={index} className="flex justify-between items-center text-xs">
+                                  <span className="text-gray-600 dark:text-gray-400">{item.month}</span>
+                                  <span className="font-medium text-gray-900 dark:text-gray-100">{item.count} órdenes</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Orders by store */}
+                        {step.details.ordersByStore && step.details.ordersByStore.length > 0 && (
+                          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Store className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                Órdenes por local
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              {step.details.ordersByStore.map((item, index) => (
+                                <div key={index} className="flex justify-between items-center text-xs">
+                                  <span className="text-gray-600 dark:text-gray-400">{item.storeName}</span>
+                                  <span className="font-medium text-gray-900 dark:text-gray-100">{item.count} órdenes</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

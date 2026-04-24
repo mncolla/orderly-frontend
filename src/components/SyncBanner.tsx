@@ -1,5 +1,5 @@
 import { useSyncContext } from '@/contexts/SyncContext';
-import { Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Loader2, RefreshCw, AlertTriangle, Calendar, Store } from 'lucide-react';
 import { useMemo } from 'react';
 
 /**
@@ -96,6 +96,29 @@ export function SyncBanner() {
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                 {stepInfo.name}: {stepInfo.description} ({totalProgress}%)
               </p>
+
+              {/* Show orders details when syncing orders */}
+              {currentStep?.step === 'orders' && currentStep.details && (
+                <div className="mt-2 space-y-1">
+                  {currentStep.details.totalOrders !== undefined && (
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                      {currentStep.details.totalOrders} órdenes encontradas
+                    </p>
+                  )}
+                  {currentStep.details.ordersByMonth && currentStep.details.ordersByMonth.length > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                      <Calendar className="h-3 w-3" />
+                      <span>Por mes: {currentStep.details.ordersByMonth.slice(0, 2).map(m => `${m.month} (${m.count})`).join(', ')}</span>
+                    </div>
+                  )}
+                  {currentStep.details.ordersByStore && currentStep.details.ordersByStore.length > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                      <Store className="h-3 w-3" />
+                      <span>Por local: {currentStep.details.ordersByStore.slice(0, 2).map(s => `${s.storeName} (${s.count})`).join(', ')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

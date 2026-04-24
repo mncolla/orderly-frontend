@@ -89,6 +89,13 @@ export interface SyncStep {
   progress: number;
   total: number;
   message: string;
+  details?: SyncStepDetails;
+}
+
+export interface SyncStepDetails {
+  ordersByStore?: Array<{ storeName: string; vendorId: string; count: number }>;
+  ordersByMonth?: Array<{ month: string; count: number }>;
+  totalOrders?: number;
 }
 
 export interface SyncProgress {

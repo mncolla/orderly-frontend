@@ -46,53 +46,9 @@ export function OnboardingSyncProvider({ children }: { children: ReactNode }) {
           const parsed = JSON.parse(stored);
           console.log('🔄 OnboardingSyncContext - parsed:', parsed);
 
-          // Leer estructura del OnboardingWizard (syncProgress)
-          if (parsed.syncProgress && parsed.isSyncing) {
-            const progress = parsed.syncProgress;
-            const steps = progress.steps || [];
-            const currentStepIndex = progress.currentStep;
-            const currentStepData = steps[currentStepIndex];
-
-            console.log('🔄 OnboardingSyncContext - syncProgress detected:', { progress, currentStepData });
-
-            // Calcular progreso global
-            const globalProgress = Math.round(
-              ((currentStepIndex + (currentStepData?.progress || 0) / (currentStepData?.total || 1)) /
-                (progress.totalSteps || 1)) * 100
-            );
-
-            // Transformar a la estructura que espera el modal
-            const currentSync: SyncStepInfo | null = currentStepData
-              ? {
-                  step: 'connection', // Usamos connection genéricamente para el sync global
-                  status: currentStepData.status === 'failed'
-                    ? 'error'
-                    : currentStepData.status === 'completed'
-                    ? 'completed'
-                    : 'in_progress',
-                  progress: globalProgress,
-                  total: 100,
-                  name: 'Sincronizando datos',
-                  description: `${currentStepData.message || 'Sincronizando...'} (${globalProgress}%)`,
-                  timestamp: parsed.timestamp || Date.now(),
-                }
-              : null;
-
-            console.log('🔄 OnboardingSyncContext - setting currentSync:', currentSync);
-
-            setCurrentSync(currentSync);
-            setIsBlocked(parsed.isSyncing);
-
-            // Si hay un sync en progreso y pasó el tiempo, desbloquear
-            if (currentSync?.status === 'in_progress') {
-              const syncAge = Date.now() - (parsed.timestamp || 0);
-              if (syncAge > SYNC_BLOCK_DURATION) {
-                setIsBlocked(false);
-              }
-            }
-          }
-          // Leer estructura propia (currentSync)
-          else if (parsed.currentSync) {
+          // Solo leer estructura propia (currentSync) - ignorar el formato antiguo del OnboardingWizard
+          // El formato antiguo (syncProgress/isSyncing) ya no se usa para mostrar el modal
+          if (parsed.currentSync) {
             setCurrentSync(parsed.currentSync);
             setIsBlocked(parsed.isBlocked);
 
@@ -103,6 +59,10 @@ export function OnboardingSyncProvider({ children }: { children: ReactNode }) {
                 setIsBlocked(false);
               }
             }
+          } else if (parsed.syncProgress && parsed.isSyncing) {
+            // Si hay datos antiguos del formato syncProgress, limpiarlos para evitar confusiones
+            console.log('🔄 OnboardingSyncContext - old syncProgress format detected, clearing...');
+            localStorage.removeItem(SYNC_STORAGE_KEY);
           }
         }
       } catch (error) {

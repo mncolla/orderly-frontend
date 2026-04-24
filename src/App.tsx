@@ -6,6 +6,7 @@ import { Sidebar } from './components/Sidebar';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { OnboardingSyncProvider } from './contexts/OnboardingSyncContext';
 import { OnboardingSyncModal } from './components/OnboardingSyncModal';
+import { SyncBanner } from './components/SyncBanner';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import DebugPage from './pages/DebugPage';
@@ -47,6 +48,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <main className="lg:ml-64 min-h-screen">
         <div className="pt-16 lg:pt-0">
+          <SyncBanner />
           {children}
         </div>
       </main>
