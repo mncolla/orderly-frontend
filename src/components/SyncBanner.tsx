@@ -1,5 +1,5 @@
 import { useSyncContext } from '@/contexts/SyncContext';
-import { Loader2, RefreshCw, AlertTriangle, Calendar, Store } from 'lucide-react';
+import { Loader2, RefreshCw, AlertTriangle, Calendar, Store, Smartphone } from 'lucide-react';
 import { useMemo } from 'react';
 
 /**
@@ -17,9 +17,6 @@ import { useMemo } from 'react';
 export function SyncBanner() {
   const { activeSyncs, isSyncing } = useSyncContext();
 
-  // Debug logging
-  console.log('🎯 SyncBanner render:', { isSyncing, activeSyncsCount: activeSyncs.size, activeSyncs });
-
   // Si no hay sincronizaciones activas, no mostrar nada
   if (!isSyncing || activeSyncs.size === 0) {
     return null;
@@ -27,10 +24,27 @@ export function SyncBanner() {
 
   // Obtener la primera sincronización activa (generalmente solo hay una a la vez)
   const firstSync = Array.from(activeSyncs.values())[0];
+  const platform = Array.from(activeSyncs.entries())[0]?.[0]; // [platform, progress]
 
-  if (!firstSync) {
+  if (!firstSync || !platform) {
     return null;
   }
+
+  // Obtener el nombre legible de la plataforma
+  const getPlatformName = (platform: string) => {
+    switch (platform) {
+      case 'PEDIDOS_YA':
+        return 'PedidosYa';
+      case 'RAPPI':
+        return 'Rappi';
+      case 'GLOVO':
+        return 'Glovo';
+      case 'UBER_EATS':
+        return 'Uber Eats';
+      default:
+        return platform;
+    }
+  };
 
   // Calcular progreso total
   const totalProgress = useMemo(() => {
@@ -93,8 +107,18 @@ export function SyncBanner() {
             )}
 
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm text-gray-900 dark:text-white">
-                {currentStep?.step === 'orders' ? 'Sincronización Extendida en Progreso' : 'Sincronizando...'}
+              <p className="font-semibold text-sm text-gray-900 dark:text-white flex items-center gap-2">
+                {currentStep?.step === 'orders' ? (
+                  <>
+                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 animate-pulse" />
+                    Sincronización Extendida en Progreso
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin" />
+                    Sincronizando con {getPlatformName(platform)}
+                  </>
+                )}
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                 {stepInfo.name}: {stepInfo.description} ({totalProgress}%)
@@ -126,7 +150,13 @@ export function SyncBanner() {
           </div>
 
           {/* Advertencia sobre datos */}
-          <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+          <div className="hidden sm:flex items-center gap-4 flex-shrink-0">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/50 dark:bg-gray-800/50">
+              <Smartphone className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {getPlatformName(platform)}
+              </span>
+            </div>
             <div className="text-right">
               <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
                 ⚠️ Los datos pueden no estar actualizados

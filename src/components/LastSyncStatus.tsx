@@ -1,6 +1,7 @@
 import { CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
+import type { DeliveryPlatform } from '@/types/integrations';
 
 /**
  * LastSyncStatus - Muestra el estado de la última sincronización
@@ -11,6 +12,22 @@ import { useEffect, useState } from 'react';
 export function LastSyncStatus() {
   const { user } = useAuth();
   const [timeAgo, setTimeAgo] = useState('');
+
+  // Helper to get platform name
+  const getPlatformName = (platform: DeliveryPlatform): string => {
+    switch (platform) {
+      case 'PEDIDOS_YA':
+        return 'PedidosYa';
+      case 'RAPPI':
+        return 'Rappi';
+      case 'GLOVO':
+        return 'Glovo';
+      case 'UBER_EATS':
+        return 'Uber Eats';
+      default:
+        return platform;
+    }
+  };
 
   // Obtener la integración principal del usuario
   const integration = user?.integrations?.[0];
@@ -64,7 +81,7 @@ export function LastSyncStatus() {
       return {
         icon: RefreshCw,
         iconClass: 'animate-spin text-blue-600 dark:text-blue-400',
-        text: 'Sincronizando...',
+        text: `Sincronizando ${getPlatformName(integration.platform as DeliveryPlatform)}...`,
         bgClass: 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800',
         textClass: 'text-blue-700 dark:text-blue-300'
       };
@@ -98,9 +115,9 @@ export function LastSyncStatus() {
       <StatusIcon className={`h-4 w-4 ${status.iconClass}`} />
       <div className="flex flex-col">
         <span className={`text-xs font-medium ${status.textClass}`}>
-          {integration.lastSyncStatus === 'IN_PROGRESS' ? 'Sincronizando...' : `Última sync: ${status.text}`}
+          {integration.lastSyncStatus === 'IN_PROGRESS' ? status.text : `Última sync: ${status.text}`}
         </span>
-        {timeAgo && (
+        {timeAgo && integration.lastSyncStatus !== 'IN_PROGRESS' && (
           <span className="text-xs text-gray-600 dark:text-gray-400">
             {timeAgo}
           </span>

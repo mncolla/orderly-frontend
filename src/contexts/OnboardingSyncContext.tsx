@@ -40,11 +40,9 @@ export function OnboardingSyncProvider({ children }: { children: ReactNode }) {
     const loadState = () => {
       try {
         const stored = localStorage.getItem(SYNC_STORAGE_KEY);
-        console.log('🔄 OnboardingSyncContext - loadState called, stored:', stored);
 
         if (stored) {
           const parsed = JSON.parse(stored);
-          console.log('🔄 OnboardingSyncContext - parsed:', parsed);
 
           // Solo leer estructura propia (currentSync) - ignorar el formato antiguo del OnboardingWizard
           // El formato antiguo (syncProgress/isSyncing) ya no se usa para mostrar el modal
@@ -61,7 +59,6 @@ export function OnboardingSyncProvider({ children }: { children: ReactNode }) {
             }
           } else if (parsed.syncProgress && parsed.isSyncing) {
             // Si hay datos antiguos del formato syncProgress, limpiarlos para evitar confusiones
-            console.log('🔄 OnboardingSyncContext - old syncProgress format detected, clearing...');
             localStorage.removeItem(SYNC_STORAGE_KEY);
           }
         }

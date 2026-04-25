@@ -72,8 +72,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.setItem('auth_user', JSON.stringify(data.user));
       setUser(data.user);
       setError(null);
-      // Redirigir a /agency si es usuario de tipo agencia, sino a /overview
-      const redirectPath = data.user.role === 'AGENCY' ? '/agency' : '/overview';
+      // Redirigir a /agency si es usuario de tipo agencia, sino a /stores
+      const redirectPath = data.user.role === 'AGENCY' ? '/agency' : '/stores';
       navigate(redirectPath, { transition: true });
     },
     onError: (err: any) => {
@@ -89,8 +89,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.setItem('auth_user', JSON.stringify(data.user));
       setUser(data.user);
       setError(null);
-      // Redirigir a /agency si es usuario de tipo agencia, sino a /overview
-      const redirectPath = data.user.role === 'AGENCY' ? '/agency' : '/overview';
+      // Redirigir a /agency si es usuario de tipo agencia, sino a /stores
+      const redirectPath = data.user.role === 'AGENCY' ? '/agency' : '/stores';
       navigate(redirectPath, { transition: true });
     },
     onError: (err: any) => {

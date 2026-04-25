@@ -32,6 +32,22 @@ interface StoreWithConfig {
   };
 }
 
+// Helper para obtener el nombre legible de la plataforma
+const getPlatformName = (platform: DeliveryPlatform): string => {
+  switch (platform) {
+    case 'PEDIDOS_YA':
+      return 'PedidosYa';
+    case 'RAPPI':
+      return 'Rappi';
+    case 'GLOVO':
+      return 'Glovo';
+    case 'UBER_EATS':
+      return 'Uber Eats';
+    default:
+      return platform;
+  }
+};
+
 export function OnboardingWizard() {
   const [, navigate] = useLocation();
   const { refetchUser } = useAuth();
@@ -366,7 +382,7 @@ export function OnboardingWizard() {
       // Refresh user and navigate
       console.log('🔄 Actualizando usuario y navegando...');
       await refetchUser();
-      navigate('/overview');
+      navigate('/stores');
     } catch (error: any) {
       console.error('❌ Error completando onboarding:', error);
       alert(`Error al completar el onboarding: ${error.message}`);
@@ -555,12 +571,12 @@ export function OnboardingWizard() {
                     ¡Cuenta conectada exitosamente!
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Sincronizando tus datos...
+                    {isSyncing ? `Sincronizando datos de ${getPlatformName(selectedPlatform)}...` : 'Iniciando sincronización...'}
                   </p>
                   <div className="flex items-center justify-center gap-2">
                     <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin" />
                     <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {isSyncing ? 'Procesando datos...' : 'Iniciando sincronización...'}
+                      {isSyncing ? `Procesando datos de ${getPlatformName(selectedPlatform)}...` : 'Iniciando sincronización...'}
                     </span>
                   </div>
                 </div>

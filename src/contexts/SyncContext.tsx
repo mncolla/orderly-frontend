@@ -41,7 +41,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
       // Check if user is still authenticated
       if (!localStorage.getItem('auth_token')) {
-        console.log('🔒 No auth token, stopping sync polling');
         setActiveSyncs(prev => {
           const newMap = new Map(prev);
           newMap.delete(platform);
@@ -64,7 +63,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             });
           }
 
-          // Clear interval
+          // Limpiar interval de polling para esta plataforma
           const existing = pollingIntervalsRef.current.get(platform);
           if (existing) {
             clearInterval(existing);
@@ -84,12 +83,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         console.error(`Error polling sync progress for ${platform}:`, error);
         // If auth error (401), stop polling
         if (error instanceof Error && error.message.includes('401')) {
-          console.log('🔒 Auth error, stopping sync polling');
           clearInterval(interval);
           pollingIntervalsRef.current.delete(platform);
         }
       }
-    }, 2000);
+    }, 3000);
 
     pollingIntervalsRef.current.set(platform, interval);
   }, []);
@@ -97,7 +95,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const startSync = useCallback(async (platform: DeliveryPlatform) => {
     // PROTECCIÓN: Si ya hay un sync activo o iniciándose para esta plataforma, ignorar
     if (activeSyncs.has(platform) || startingSyncsRef.current.has(platform)) {
-      console.log(`⚠️ Sync already in progress for ${platform}, ignoring duplicate request`);
       return;
     }
 
@@ -125,20 +122,36 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       // Solo verificar syncs si el usuario está autenticado
       const hasToken = !!localStorage.getItem('auth_token');
       if (!hasToken) {
-        console.log('🔒 No auth token, skipping sync progress check');
         return;
       }
 
-      const platforms: DeliveryPlatform[] = ['PEDIDOS_YA', 'RAPPI', 'GLOVO', 'UBER_EATS'];
-      console.log('🔍 Checking for active syncs across all platforms...');
+      // Obtener usuario actual para saber qué plataformas verificar
+      const storedUser = localStorage.getItem('auth_user');
+      if (!storedUser) {
+        return;
+      }
 
-      for (const platform of platforms) {
+      let user;
+      try {
+        user = JSON.parse(storedUser);
+      } catch (error) {
+        console.error('Error parsing stored user:', error);
+        return;
+      }
+
+      // Solo verificar plataformas que el usuario tiene integradas
+      const userPlatforms = user?.integrations?.map((int: any) => int.platform) || [];
+
+      if (userPlatforms.length === 0) {
+        return;
+      }
+
+      for (const platform of userPlatforms) {
         try {
           const result = await platformIntegrationsService.getSyncProgress(platform);
-          console.log(`📊 Sync progress for ${platform}:`, result);
 
           if (result.status === 'in_progress' && result.progress) {
-            console.log(`✅ Detected active sync for ${platform}, starting polling`);
+            console.log(`✅ Sync active for ${platform}: step ${result.progress.currentStep}/${result.progress.totalSteps}`);
             if (isMountedRef.current) {
               setActiveSyncs(prev => {
                 const newMap = new Map(prev);
@@ -147,20 +160,22 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
               });
               startPolling(platform);
             }
-          } else {
-            console.log(`ℹ️ No active sync for ${platform}, status: ${result.status}`);
           }
         } catch (error) {
           // Ignore errors when checking for active syncs (e.g., 401, 404)
-          console.log(`⚠️ Error checking sync for ${platform}:`, error);
         }
       }
     };
 
+    // Check inmediatamente al montar
     checkForActiveSyncs();
+
+    // Polling periódico para detectar nuevos syncs (cada 5 segundos para detección rápida)
+    const pollingInterval = setInterval(checkForActiveSyncs, 5000);
 
     return () => {
       isMountedRef.current = false;
+      clearInterval(pollingInterval);
     };
   }, []); // Remove startPolling from dependencies to prevent potential loops
 

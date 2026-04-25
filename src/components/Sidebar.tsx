@@ -1,25 +1,26 @@
 import { Link, useLocation } from 'wouter';
 import { useState } from 'react';
-import { BarChart3, ShoppingBag, UtensilsCrossed, Lightbulb, LogOut, Calendar, Settings as SettingsIcon, Users, Menu, X, TrendingUp, Store } from 'lucide-react';
+import { BarChart3, ShoppingBag, UtensilsCrossed, Lightbulb, LogOut, Calendar, Settings as SettingsIcon, Users, Menu, X, TrendingUp, Store, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { LastSyncStatus } from './LastSyncStatus';
+import { useSyncDataStatus } from '@/hooks/useSyncDataStatus';
 
 const ownerSidebarItems = [
-  { href: '/overview', label: 'sidebar.dashboard', icon: BarChart3 },
-  { href: '/operations', label: 'sidebar.operations', icon: ShoppingBag },
-  { href: '/menu', label: 'sidebar.menu', icon: UtensilsCrossed },
-  { href: '/stores', label: 'sidebar.stores', icon: Store },
-  { href: '/suggestions', label: 'sidebar.suggestions', icon: Lightbulb },
-  { href: '/history', label: 'sidebar.history', icon: Calendar },
-  { href: '/settings', label: 'sidebar.settings', icon: SettingsIcon },
+  { href: '/overview', label: 'sidebar.dashboard', icon: BarChart3, requires: 'orders' as const },
+  { href: '/operations', label: 'sidebar.operations', icon: ShoppingBag, requires: 'orders' as const },
+  { href: '/menu', label: 'sidebar.menu', icon: UtensilsCrossed, requires: 'menu' as const },
+  { href: '/stores', label: 'sidebar.stores', icon: Store, requires: null },
+  { href: '/suggestions', label: 'sidebar.suggestions', icon: Lightbulb, requires: 'orders' as const },
+  { href: '/history', label: 'sidebar.history', icon: Calendar, requires: 'orders' as const },
+  { href: '/settings', label: 'sidebar.settings', icon: SettingsIcon, requires: null },
 ];
 
 const agencySidebarItems = [
-  { href: '/agency', label: 'sidebar.agency', icon: Users },
-  { href: '/users', label: 'sidebar.users', icon: Users },
-  { href: '/settings', label: 'sidebar.settings', icon: SettingsIcon },
+  { href: '/agency', label: 'sidebar.agency', icon: Users, requires: null },
+  { href: '/users', label: 'sidebar.users', icon: Users, requires: null },
+  { href: '/settings', label: 'sidebar.settings', icon: SettingsIcon, requires: null },
 ];
 
 export function Sidebar() {
@@ -27,6 +28,7 @@ export function Sidebar() {
   const { logout, user } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { t } = useTranslation();
+  const syncDataStatus = useSyncDataStatus();
 
   const sidebarItems = user?.role === 'AGENCY' ? agencySidebarItems : ownerSidebarItems;
 
@@ -64,26 +66,73 @@ export function Sidebar() {
             const isActive = location === item.href;
             const Icon = item.icon;
 
+            // Verificar si el dato requerido está siendo sincronizado
+            const isDataLoading = item.requires
+              ? (syncDataStatus[item.requires]?.loading || !syncDataStatus[item.requires]?.available)
+              : false;
+
+            const isDataAvailable = item.requires
+              ? syncDataStatus[item.requires]?.available
+              : true;
+
+            console.log(`🔗 ${item.href}:`, {
+              requires: item.requires,
+              isDataLoading,
+              isDataAvailable,
+              dataStatus: item.requires ? syncDataStatus[item.requires] : 'N/A',
+              fullStatus: syncDataStatus,
+            });
+
             return (
               <li key={item.href}>
-                <Link
-                  href={item.href}
-                  onClick={handleNavigate}
-                  className={`
-                    flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 relative group
-                    ${
-                      isActive
-                        ? 'bg-blue-600 !text-white shadow-lg shadow-blue-500/30'
-                        : 'text-blue-900 dark:text-gray-100 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                    }
-                  `}
-                >
-                  <Icon className={`h-5 w-5 ${isActive ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
-                  <span className="flex-1">{t(item.label as any)}</span>
-                  {isActive && (
-                    <div className="absolute right-2 h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                  )}
-                </Link>
+                {isDataLoading ? (
+                  // Mostrar botón deshabilitado con loading
+                  <div
+                    className={`
+                      flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 relative
+                      opacity-50 cursor-not-allowed
+                      text-gray-400 dark:text-gray-600
+                    `}
+                    title="Sincronizando datos..."
+                  >
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span className="flex-1">{t(item.label as any)}</span>
+                    <span className="text-xs">Sincronizando...</span>
+                  </div>
+                ) : isDataAvailable ? (
+                  // Mostrar botón normal
+                  <Link
+                    href={item.href}
+                    onClick={handleNavigate}
+                    className={`
+                      flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 relative group
+                      ${
+                        isActive
+                          ? 'bg-blue-600 !text-white shadow-lg shadow-blue-500/30'
+                          : 'text-blue-900 dark:text-gray-100 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                      }
+                    `}
+                  >
+                    <Icon className={`h-5 w-5 ${isActive ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
+                    <span className="flex-1">{t(item.label as any)}</span>
+                    {isActive && (
+                      <div className="absolute right-2 h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                    )}
+                  </Link>
+                ) : (
+                  // Mostrar botón deshabilitado
+                  <div
+                    className={`
+                      flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 relative
+                      opacity-50 cursor-not-allowed
+                      text-gray-400 dark:text-gray-600
+                    `}
+                    title="Datos no disponibles"
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="flex-1">{t(item.label as any)}</span>
+                  </div>
+                )}
               </li>
             );
           })}

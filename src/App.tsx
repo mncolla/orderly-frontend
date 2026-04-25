@@ -39,7 +39,7 @@ function RoleBasedRedirect() {
 
   if (!shouldRedirect) return null;
 
-  return <Redirect to={user?.role === 'AGENCY' ? '/agency' : '/overview'} />;
+  return <Redirect to={user?.role === 'AGENCY' ? '/agency' : '/stores'} />;
 }
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
