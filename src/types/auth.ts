@@ -4,6 +4,8 @@ export type UserRole = 'OWNER' | 'AGENCY' | 'ADMIN';
 
 export type AccountType = 'FREE' | 'PRO' | 'ENTERPRISE';
 
+export type SyncStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+
 export interface User {
   id: string;
   email: string;
@@ -16,6 +18,10 @@ export interface User {
     connected: boolean;
     email?: string;
     lastSyncAt?: string | null;
+    lastSyncStatus?: SyncStatus;
+    lastSyncCompletedAt?: string | null;
+    lastSyncStartedAt?: string | null;
+    lastSyncError?: string | null;
   }>;
   createdAt: string;
   updatedAt: string;

@@ -1,5 +1,7 @@
 export type DeliveryPlatform = 'PEDIDOS_YA' | 'RAPPI' | 'GLOVO' | 'UBER_EATS';
 
+export type SyncStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+
 export type SuggestionType =
   // Generic types (work across all platforms)
   | 'PRICE_CHANGE'
@@ -26,6 +28,10 @@ export interface PlatformIntegration {
   email: string;
   connectedAt: string | null;
   lastSyncAt: string | null;
+  lastSyncStatus?: SyncStatus;
+  lastSyncStartedAt?: string | null;
+  lastSyncCompletedAt?: string | null;
+  lastSyncError?: string | null;
   ownerId: string;
   stores?: StoreInfo[];
 }

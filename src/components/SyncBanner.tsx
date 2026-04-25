@@ -17,6 +17,9 @@ import { useMemo } from 'react';
 export function SyncBanner() {
   const { activeSyncs, isSyncing } = useSyncContext();
 
+  // Debug logging
+  console.log('🎯 SyncBanner render:', { isSyncing, activeSyncsCount: activeSyncs.size, activeSyncs });
+
   // Si no hay sincronizaciones activas, no mostrar nada
   if (!isSyncing || activeSyncs.size === 0) {
     return null;

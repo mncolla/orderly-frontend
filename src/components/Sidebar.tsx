@@ -4,6 +4,7 @@ import { BarChart3, ShoppingBag, UtensilsCrossed, Lightbulb, LogOut, Calendar, S
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
+import { LastSyncStatus } from './LastSyncStatus';
 
 const ownerSidebarItems = [
   { href: '/overview', label: 'sidebar.dashboard', icon: BarChart3 },
@@ -105,6 +106,13 @@ export function Sidebar() {
           </span>
         </div>
       </div>
+
+      {/* Last Sync Status */}
+      {user?.role !== 'AGENCY' && (
+        <div className="px-4 py-2">
+          <LastSyncStatus />
+        </div>
+      )}
 
       {/* Logout */}
       <div className="p-4 border-t border-gray-200 dark:border-gray-700">

@@ -43,6 +43,22 @@ export interface ItemsRanking {
   totalRevenue: number;
 }
 
+export interface ActiveDeal {
+  id: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  vendorIds: string[];
+  discountPercentage?: number;
+  discountAmount?: number;
+  sponsorship?: {
+    platform?: number;
+    vendor?: number;
+  };
+  isRecurring?: boolean;
+}
+
 export interface OverviewAlert {
   type: 'suggestion' | 'warning' | 'weather';
   severity: 'high' | 'medium' | 'low';
@@ -60,5 +76,6 @@ export interface OverviewResponse {
   chart: OverviewChart;
   platformDistribution: PlatformDistribution[];
   itemsRanking?: ItemsRanking[];
+  activeDeals?: ActiveDeal[];
   alerts: OverviewAlert[];
 }

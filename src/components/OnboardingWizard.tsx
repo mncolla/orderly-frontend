@@ -496,7 +496,7 @@ export function OnboardingWizard() {
               </div>
 
               {/* Connection form */}
-              {!needsOTP ? (
+              {!needsOTP && !createdIntegration && !isSyncing ? (
                 <form onSubmit={handleConnectPlatform} className="space-y-4">
                   {connectionError && (
                     <div className="p-3 sm:p-4 text-sm text-red-800 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-800">
@@ -545,6 +545,25 @@ export function OnboardingWizard() {
                     )}
                   </Button>
                 </form>
+              ) : createdIntegration || isSyncing ? (
+                // Mostrar estado de conexión exitosa y sincronización
+                <div className="text-center py-8">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
+                    <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    ¡Cuenta conectada exitosamente!
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Sincronizando tus datos...
+                  </p>
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {isSyncing ? 'Procesando datos...' : 'Iniciando sincronización...'}
+                    </span>
+                  </div>
+                </div>
               ) : (
                 <form onSubmit={handleVerifyOTP} className="space-y-4">
                   <div className="text-center mb-4">

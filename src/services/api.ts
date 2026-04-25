@@ -27,9 +27,12 @@ const getErrorMessage = (status: number, endpoint: string): string => {
 // Manejar errores de autenticación
 const handleAuthError = (status: number) => {
   if (status === 401) {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
-    window.location.href = '/login';
+    // Solo redirigir si NO estamos ya en la página de login
+    if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      window.location.href = '/login';
+    }
   }
 };
 

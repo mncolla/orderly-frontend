@@ -16,6 +16,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [activeSyncs, setActiveSyncs] = useState<Map<string, SyncProgress>>(new Map());
   const pollingIntervalsRef = useRef<Map<string, number>>(new Map());
   const startingSyncsRef = useRef<Set<string>>(new Set()); // Track syncs that are being started
+  const isMountedRef = useRef(true); // Prevent setting state after unmount
 
   const isSyncing = activeSyncs.size > 0;
 
@@ -32,16 +33,36 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
     // Start new polling interval
     const interval = setInterval(async () => {
+      // Check if component is still mounted
+      if (!isMountedRef.current) {
+        clearInterval(interval);
+        return;
+      }
+
+      // Check if user is still authenticated
+      if (!localStorage.getItem('auth_token')) {
+        console.log('🔒 No auth token, stopping sync polling');
+        setActiveSyncs(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(platform);
+          return newMap;
+        });
+        clearInterval(interval);
+        return;
+      }
+
       try {
         const result = await platformIntegrationsService.getSyncProgress(platform);
 
         if (result.status === 'no_sync_in_progress') {
           // Sync completed or stopped
-          setActiveSyncs(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(platform);
-            return newMap;
-          });
+          if (isMountedRef.current) {
+            setActiveSyncs(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(platform);
+              return newMap;
+            });
+          }
 
           // Clear interval
           const existing = pollingIntervalsRef.current.get(platform);
@@ -52,7 +73,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        if (result.progress) {
+        if (result.progress && isMountedRef.current) {
           setActiveSyncs(prev => {
             const newMap = new Map(prev);
             newMap.set(platform, result.progress!);
@@ -61,6 +82,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error(`Error polling sync progress for ${platform}:`, error);
+        // If auth error (401), stop polling
+        if (error instanceof Error && error.message.includes('401')) {
+          console.log('🔒 Auth error, stopping sync polling');
+          clearInterval(interval);
+          pollingIntervalsRef.current.delete(platform);
+        }
       }
     }, 2000);
 
@@ -91,6 +118,51 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       startingSyncsRef.current.delete(platform);
     }
   }, [activeSyncs, startPolling]);
+
+  // Detectar syncs activos al montar (para continuar con syncs iniciados desde el onboarding)
+  useEffect(() => {
+    const checkForActiveSyncs = async () => {
+      // Solo verificar syncs si el usuario está autenticado
+      const hasToken = !!localStorage.getItem('auth_token');
+      if (!hasToken) {
+        console.log('🔒 No auth token, skipping sync progress check');
+        return;
+      }
+
+      const platforms: DeliveryPlatform[] = ['PEDIDOS_YA', 'RAPPI', 'GLOVO', 'UBER_EATS'];
+      console.log('🔍 Checking for active syncs across all platforms...');
+
+      for (const platform of platforms) {
+        try {
+          const result = await platformIntegrationsService.getSyncProgress(platform);
+          console.log(`📊 Sync progress for ${platform}:`, result);
+
+          if (result.status === 'in_progress' && result.progress) {
+            console.log(`✅ Detected active sync for ${platform}, starting polling`);
+            if (isMountedRef.current) {
+              setActiveSyncs(prev => {
+                const newMap = new Map(prev);
+                newMap.set(platform, result.progress!);
+                return newMap;
+              });
+              startPolling(platform);
+            }
+          } else {
+            console.log(`ℹ️ No active sync for ${platform}, status: ${result.status}`);
+          }
+        } catch (error) {
+          // Ignore errors when checking for active syncs (e.g., 401, 404)
+          console.log(`⚠️ Error checking sync for ${platform}:`, error);
+        }
+      }
+    };
+
+    checkForActiveSyncs();
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []); // Remove startPolling from dependencies to prevent potential loops
 
   // Cleanup intervals on unmount
   useEffect(() => {

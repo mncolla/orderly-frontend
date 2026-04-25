@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, ShoppingCart, Clock, AlertTriangle, ArrowUpRight, ArrowDownRight, Target } from 'lucide-react';
+import { DollarSign, ShoppingCart, Clock, AlertTriangle, ArrowUpRight, ArrowDownRight, Target, Tag, Percent, Calendar } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOverview } from '../hooks/useOverview';
 import { ChartLineMultiple } from '@/components/ChartLineMultiple';
@@ -456,6 +456,121 @@ export function OverviewPage() {
             </div>
           )}
         </div>
+
+        {/* Active Deals */}
+        {overview?.activeDeals && overview.activeDeals.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
+              <div className="flex items-center gap-2">
+                <Tag className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Promociones Activas</h3>
+                <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                  {overview.activeDeals.length}
+                </span>
+              </div>
+            </div>
+            <div className="p-6 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Promoción</TableHead>
+                    <TableHead>Descuento</TableHead>
+                    <TableHead>Fecha Inicio</TableHead>
+                    <TableHead>Fecha Fin</TableHead>
+                    <TableHead>Locales</TableHead>
+                    <TableHead>Financiamiento</TableHead>
+                    <TableHead>Estado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {overview.activeDeals.map((deal) => {
+                    const formatDate = (dateStr: string) => {
+                      const date = new Date(dateStr);
+                      return date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+                    };
+
+                    const isPlatformFunded = deal.sponsorship?.platform && deal.sponsorship.platform > 0;
+                    const isVendorFunded = deal.sponsorship?.vendor && deal.sponsorship.vendor > 0;
+
+                    return (
+                      <TableRow key={deal.id}>
+                        <TableCell className="font-medium text-gray-900 dark:text-white">
+                          {deal.title === 'amount'
+                            ? `Descuento $${deal.discountAmount?.toLocaleString()}`
+                            : deal.title === 'percentage'
+                              ? `Descuento ${deal.discountPercentage}%`
+                              : deal.title
+                          }
+                        </TableCell>
+                        <TableCell>
+                          {deal.discountPercentage !== undefined ? (
+                            <div className="flex items-center gap-1">
+                              <Percent className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                              <span className="font-semibold text-purple-600 dark:text-purple-400">
+                                {deal.discountPercentage}%
+                              </span>
+                            </div>
+                          ) : deal.discountAmount !== undefined ? (
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                              <span className="font-semibold text-purple-600 dark:text-purple-400">
+                                ${deal.discountAmount.toLocaleString()}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 dark:text-gray-600">N/A</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-gray-600 dark:text-gray-400">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-gray-400" />
+                            {formatDate(deal.startDate)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-gray-600 dark:text-gray-400">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-gray-400" />
+                            {formatDate(deal.endDate)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-gray-600 dark:text-gray-400">
+                          {deal.vendorIds.length} local{deal.vendorIds.length !== 1 ? 'es' : ''}
+                        </TableCell>
+                        <TableCell>
+                          {isPlatformFunded || isVendorFunded ? (
+                            <div className="flex gap-1">
+                              {isPlatformFunded && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                  PY {deal.sponsorship!.platform}%
+                                </span>
+                              )}
+                              {isVendorFunded && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                  Tú {deal.sponsorship!.vendor}%
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 dark:text-gray-600">N/A</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            deal.status === 'active'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                          }`}>
+                            {deal.status === 'active' ? 'Activa' : deal.status}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

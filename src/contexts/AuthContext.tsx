@@ -32,6 +32,7 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hasClearedToken, setHasClearedToken] = useState(false); // Prevent infinite loops
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
 
@@ -39,7 +40,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const { data: userData, error: userError, isLoading: isLoadingUser } = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: authService.getCurrentUser,
-    enabled: !!localStorage.getItem('auth_token'),
+    enabled: !!localStorage.getItem('auth_token') && !hasClearedToken, // Disable if we just cleared the token
     retry: false,
   });
 
@@ -53,13 +54,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, [userData]);
 
   useEffect(() => {
-    if (userError) {
+    if (userError && !hasClearedToken) {
+      console.log('🔴 Auth error detected, clearing credentials:', userError);
       // Si falla, limpiar el token
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
       setUser(null);
+      setHasClearedToken(true); // Prevent infinite loop
     }
-  }, [userError]);
+  }, [userError, hasClearedToken]);
 
   // Mutation para login
   const loginMutation = useMutation({

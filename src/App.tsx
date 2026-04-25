@@ -1,5 +1,6 @@
 import { Router, Route, Redirect } from 'wouter';
 import { AuthProvider } from './contexts/AuthContext';
+import { SyncProvider } from './contexts/SyncContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { OnboardingGuard } from './components/OnboardingGuard';
 import { Sidebar } from './components/Sidebar';
@@ -59,8 +60,9 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
-      <OnboardingSyncProvider>
-        <Router>
+      <SyncProvider>
+        <OnboardingSyncProvider>
+          <Router>
         {/* Debug routes - SIN AUTENTICACIÓN - Solo desarrollo */}
         <Route path="/debug" component={DebugPage} />
         <Route path="/user-debug" component={UserDebugPage} />
@@ -176,6 +178,7 @@ function App() {
         <OnboardingSyncModal />
       </Router>
     </OnboardingSyncProvider>
+      </SyncProvider>
     </AuthProvider>
   );
 }
