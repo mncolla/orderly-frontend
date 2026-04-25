@@ -18,13 +18,13 @@ export function SyncBanner() {
   const { activeSyncs, isSyncing } = useSyncContext();
 
   // Si no hay sincronizaciones activas, no mostrar nada
-  if (!isSyncing || activeSyncs.size === 0) {
+  if (!isSyncing || Object.keys(activeSyncs).length === 0) {
     return null;
   }
 
   // Obtener la primera sincronización activa (generalmente solo hay una a la vez)
-  const firstSync = Array.from(activeSyncs.values())[0];
-  const platform = Array.from(activeSyncs.entries())[0]?.[0]; // [platform, progress]
+  const firstSync = Object.values(activeSyncs)[0];
+  const platform = Object.keys(activeSyncs)[0]; // [platform, progress]
 
   if (!firstSync || !platform) {
     return null;

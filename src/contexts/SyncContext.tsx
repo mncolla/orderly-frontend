@@ -3,8 +3,15 @@ import type { DeliveryPlatform } from '@/types/integrations';
 import type { SyncProgress } from '@/services/platformIntegrationsService';
 import { platformIntegrationsService } from '@/services/platformIntegrationsService';
 
+// Evento global para notificar cambios en el sync
+declare global {
+  interface Window {
+    dispatchSyncEvent?: (event: string, data: any) => void;
+  }
+}
+
 interface SyncContextType {
-  activeSyncs: Map<string, SyncProgress>;
+  activeSyncs: Record<string, SyncProgress>; // Changed from Map to Record
   isSyncing: boolean;
   getSyncProgress: (platform: DeliveryPlatform) => SyncProgress | undefined;
   startSync: (platform: DeliveryPlatform) => Promise<void>;
@@ -13,15 +20,38 @@ interface SyncContextType {
 const SyncContext = createContext<SyncContextType | undefined>(undefined);
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
-  const [activeSyncs, setActiveSyncs] = useState<Map<string, SyncProgress>>(new Map());
+  console.log('🏗️ SyncProvider - Component mounting...');
+  const [activeSyncs, setActiveSyncs] = useState<Record<string, SyncProgress>>({});
   const pollingIntervalsRef = useRef<Map<string, number>>(new Map());
   const startingSyncsRef = useRef<Set<string>>(new Set()); // Track syncs that are being started
   const isMountedRef = useRef(true); // Prevent setting state after unmount
 
-  const isSyncing = activeSyncs.size > 0;
+  const isSyncing = Object.keys(activeSyncs).length > 0;
+  console.log('🏗️ SyncProvider - Initial state:', { isSyncing, activeSyncsKeys: Object.keys(activeSyncs) });
+
+  // Crear función global para emitir eventos de sync
+  useEffect(() => {
+    window.dispatchSyncEvent = (event: string, data: any) => {
+      if (event === 'SYNC_UPDATED') {
+        setActiveSyncs(data.activeSyncs || {});
+      }
+    };
+  }, []);
+
+  // Notificar cuando cambia activeSyncs
+  useEffect(() => {
+    console.log('🔔 SyncContext - activeSyncs changed:', {
+      activeSyncsKeys: Object.keys(activeSyncs),
+      isSyncing,
+      activeSyncsData: activeSyncs,
+    });
+    window.dispatchEvent(new CustomEvent('sync-context-updated', {
+      detail: { activeSyncs, isSyncing }
+    }));
+  }, [activeSyncs, isSyncing]);
 
   const getSyncProgress = useCallback((platform: DeliveryPlatform): SyncProgress | undefined => {
-    return activeSyncs.get(platform);
+    return activeSyncs[platform];
   }, [activeSyncs]);
 
   const startPolling = useCallback((platform: DeliveryPlatform) => {
@@ -42,9 +72,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       // Check if user is still authenticated
       if (!localStorage.getItem('auth_token')) {
         setActiveSyncs(prev => {
-          const newMap = new Map(prev);
-          newMap.delete(platform);
-          return newMap;
+          const { [platform]: _, ...rest } = prev;
+          return rest;
         });
         clearInterval(interval);
         return;
@@ -57,9 +86,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           // Sync completed or stopped
           if (isMountedRef.current) {
             setActiveSyncs(prev => {
-              const newMap = new Map(prev);
-              newMap.delete(platform);
-              return newMap;
+              const { [platform]: _, ...rest } = prev;
+              return rest;
             });
           }
 
@@ -73,10 +101,20 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (result.progress && isMountedRef.current) {
+          console.log(`🔄 SyncContext - Updating activeSyncs for ${platform}:`, {
+            currentKeys: Object.keys(activeSyncs),
+            newProgress: result.progress,
+          });
           setActiveSyncs(prev => {
-            const newMap = new Map(prev);
-            newMap.set(platform, result.progress!);
-            return newMap;
+            const newSyncs = {
+              ...prev,
+              [platform]: result.progress!,
+            };
+            console.log(`🔄 SyncContext - After setActiveSyncs for ${platform}:`, {
+              prevKeys: Object.keys(prev),
+              newKeys: Object.keys(newSyncs),
+            });
+            return newSyncs;
           });
         }
       } catch (error) {
@@ -94,7 +132,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
   const startSync = useCallback(async (platform: DeliveryPlatform) => {
     // PROTECCIÓN: Si ya hay un sync activo o iniciándose para esta plataforma, ignorar
-    if (activeSyncs.has(platform) || startingSyncsRef.current.has(platform)) {
+    if (activeSyncs[platform] || startingSyncsRef.current.has(platform)) {
       return;
     }
 
@@ -118,15 +156,18 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
   // Detectar syncs activos al montar (para continuar con syncs iniciados desde el onboarding)
   useEffect(() => {
+    console.log('🔍 SyncContext - checkForActiveSyncs running...');
     const checkForActiveSyncs = async () => {
       // Solo verificar syncs si el usuario está autenticado
       const hasToken = !!localStorage.getItem('auth_token');
+      console.log('🔍 SyncContext - Has auth token:', hasToken);
       if (!hasToken) {
         return;
       }
 
       // Obtener usuario actual para saber qué plataformas verificar
       const storedUser = localStorage.getItem('auth_user');
+      console.log('🔍 SyncContext - Stored user:', storedUser ? 'found' : 'not found');
       if (!storedUser) {
         return;
       }
@@ -141,27 +182,39 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
       // Solo verificar plataformas que el usuario tiene integradas
       const userPlatforms = user?.integrations?.map((int: any) => int.platform) || [];
+      console.log('🔍 SyncContext - User platforms to check:', userPlatforms);
 
       if (userPlatforms.length === 0) {
+        console.log('🔍 SyncContext - No user platforms found, skipping');
         return;
       }
 
       for (const platform of userPlatforms) {
         try {
+          console.log(`🔍 SyncContext - Checking ${platform}...`);
           const result = await platformIntegrationsService.getSyncProgress(platform);
+          console.log(`🔍 SyncContext - ${platform} result:`, result);
 
           if (result.status === 'in_progress' && result.progress) {
             console.log(`✅ Sync active for ${platform}: step ${result.progress.currentStep}/${result.progress.totalSteps}`);
             if (isMountedRef.current) {
+              console.log(`✅ SyncContext - Adding ${platform} to activeSyncs`);
               setActiveSyncs(prev => {
-                const newMap = new Map(prev);
-                newMap.set(platform, result.progress!);
-                return newMap;
+                const newSyncs = {
+                  ...prev,
+                  [platform]: result.progress!,
+                };
+                console.log(`✅ SyncContext - After adding ${platform}:`, {
+                  prevKeys: Object.keys(prev),
+                  newKeys: Object.keys(newSyncs),
+                });
+                return newSyncs;
               });
               startPolling(platform);
             }
           }
         } catch (error) {
+          console.error(`❌ Error checking ${platform}:`, error);
           // Ignore errors when checking for active syncs (e.g., 401, 404)
         }
       }
@@ -198,5 +251,9 @@ export function useSyncContext() {
   if (!context) {
     throw new Error('useSyncContext must be used within SyncProvider');
   }
+  console.log('🎣 useSyncContext - Called:', {
+    activeSyncsKeys: Object.keys(context.activeSyncs),
+    isSyncing: context.isSyncing,
+  });
   return context;
 }

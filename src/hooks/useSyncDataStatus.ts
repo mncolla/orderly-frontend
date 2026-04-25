@@ -31,8 +31,8 @@ export function useSyncDataStatus(): SyncDataStatus {
 
   console.log('📊 SyncDataStatus calculation:', {
     hasConnectedIntegrations,
-    activeSyncsCount: activeSyncs.size,
-    activeSyncs: Array.from(activeSyncs.entries()),
+    activeSyncsCount: Object.keys(activeSyncs).length,
+    activeSyncs: Object.entries(activeSyncs),
   });
 
   // Si no hay integraciones conectadas, todos los datos están no disponibles
@@ -42,7 +42,7 @@ export function useSyncDataStatus(): SyncDataStatus {
   }
 
   // Iterar sobre todos los syncs activos
-  for (const [_platform, progress] of activeSyncs) {
+  for (const [_platform, progress] of Object.entries(activeSyncs)) {
     status.isAnySyncing = true;
 
     console.log(`📊 Processing sync for ${_platform}, steps:`, progress.steps);

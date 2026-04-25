@@ -1,11 +1,11 @@
 import { Link, useLocation } from 'wouter';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BarChart3, ShoppingBag, UtensilsCrossed, Lightbulb, LogOut, Calendar, Settings as SettingsIcon, Users, Menu, X, TrendingUp, Store, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { LastSyncStatus } from './LastSyncStatus';
-import { useSyncDataStatus } from '@/hooks/useSyncDataStatus';
+import { useSyncContext } from '@/contexts/SyncContext';
 
 const ownerSidebarItems = [
   { href: '/overview', label: 'sidebar.dashboard', icon: BarChart3, requires: 'orders' as const },
@@ -28,7 +28,82 @@ export function Sidebar() {
   const { logout, user } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { t } = useTranslation();
-  const syncDataStatus = useSyncDataStatus();
+  const { activeSyncs, isSyncing } = useSyncContext();
+
+  console.log('🎨 Sidebar - Render:', {
+    activeSyncsKeys: Object.keys(activeSyncs),
+    isSyncing,
+    activeSyncsData: activeSyncs,
+  });
+
+  // Estado local para forzar re-render cuando hay cambios en el contexto
+  const [, forceUpdate] = useState({});
+
+  // Escuchar eventos globales del SyncContext
+  useEffect(() => {
+    const handleSyncUpdate = (event: CustomEvent) => {
+      console.log('📡 Sidebar - Received sync-context-updated event:', event.detail);
+      forceUpdate({});
+    };
+
+    window.addEventListener('sync-context-updated', handleSyncUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('sync-context-updated', handleSyncUpdate as EventListener);
+    };
+  }, []);
+
+  // Fallback: forzar actualizaciones periódicas cuando hay sync activo
+  useEffect(() => {
+    if (!isSyncing) return;
+
+    const interval = setInterval(() => {
+      forceUpdate({});
+    }, 1000); // Actualizar cada segundo durante sync
+
+    return () => clearInterval(interval);
+  }, [isSyncing]);
+
+  // Calcular el estado de los datos directamente en el Sidebar
+  const getDataTypeStatus = (dataType: 'stores' | 'menu' | 'orders') => {
+    const status = { available: false, loading: false, completed: false };
+
+    // Si no hay sync activo, asumimos que los datos están disponibles
+    if (Object.keys(activeSyncs).length === 0) {
+      status.available = true;
+      status.completed = true;
+      return status;
+    }
+
+    // Verificar si el usuario tiene integraciones conectadas
+    const hasConnectedIntegrations = user?.integrations?.some(int => int.connected) || false;
+    if (!hasConnectedIntegrations) {
+      return status;
+    }
+
+    // Analizar cada sync activo
+    for (const [_platform, progress] of Object.entries(activeSyncs)) {
+      progress.steps.forEach((step) => {
+        if (step.step === dataType) {
+          if (step.status === 'in_progress') {
+            status.loading = true;
+          } else if (step.status === 'completed') {
+            status.completed = true;
+            status.available = true;
+          }
+        }
+      });
+    }
+
+    // Si después de analizar todos los syncs, el dato no está completado ni cargando,
+    // asumimos que está disponible (ya pasó por onboarding)
+    if (!status.loading && !status.completed) {
+      status.available = true;
+      status.completed = true;
+    }
+
+    return status;
+  };
 
   const sidebarItems = user?.role === 'AGENCY' ? agencySidebarItems : ownerSidebarItems;
 
@@ -67,20 +142,17 @@ export function Sidebar() {
             const Icon = item.icon;
 
             // Verificar si el dato requerido está siendo sincronizado
-            const isDataLoading = item.requires
-              ? (syncDataStatus[item.requires]?.loading || !syncDataStatus[item.requires]?.available)
-              : false;
+            const dataType = item.requires;
+            const dataStatus = dataType ? getDataTypeStatus(dataType) : null;
+            const isDataLoading = dataType ? (dataStatus?.loading || !dataStatus?.available) : false;
+            const isDataAvailable = dataType ? (dataStatus?.available ?? false) : true;
 
-            const isDataAvailable = item.requires
-              ? syncDataStatus[item.requires]?.available
-              : true;
-
-            console.log(`🔗 ${item.href}:`, {
-              requires: item.requires,
+            console.log(`🎨 ${item.href}:`, {
               isDataLoading,
               isDataAvailable,
-              dataStatus: item.requires ? syncDataStatus[item.requires] : 'N/A',
-              fullStatus: syncDataStatus,
+              dataType,
+              dataStatus: dataStatus || 'N/A',
+              activeSyncsCount: Object.keys(activeSyncs).length,
             });
 
             return (
