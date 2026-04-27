@@ -633,35 +633,8 @@ export function OnboardingWizard() {
                 </form>
               )}
 
-              {/* Success message when connection is established */}
-              {createdIntegration && !isSyncing && (
-                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-xl space-y-3">
-                  <Check className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
-                  <p className="font-semibold text-green-900 dark:text-green-100">
-                    ¡Conexión exitosa con PedidosYa!
-                  </p>
-                  <p className="text-sm text-green-700 dark:text-green-200">
-                    Cuenta conectada: {createdIntegration.email}
-                  </p>
-                  {createdIntegration.stores && createdIntegration.stores.length > 0 && (
-                    <div className="flex items-center justify-center gap-2 text-sm text-green-700 dark:text-green-200">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>
-                        Hemos detectado {createdIntegration.stores.length} {createdIntegration.stores.length === 1 ? 'local' : 'locales'} y estamos sincronizando la información
-                      </span>
-                    </div>
-                  )}
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg mt-2">
-                    <p className="text-xs text-blue-800 dark:text-blue-200 font-medium">
-                      📝 Importante: Puedes continuar con la creación de tu cuenta.
-                      Te avisaremos cuando termine la sincronización de tus datos.
-                    </p>
-                  </div>
-                </div>
-              )}
-
               {/* Sync progress */}
-              {isSyncing && syncProgress && (
+              {syncProgress && (
                 <div className="space-y-4">
                   {/* Header de sincronización */}
                   <div className="text-center">
@@ -674,7 +647,32 @@ export function OnboardingWizard() {
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                       Esto puede tomar unos momentos. Por favor no cierres esta ventana.
                     </p>
+                    {createdIntegration && (
+                      <>
+                        <p className="text-xs text-gray-700 dark:text-gray-300 mt-2 font-medium">
+                          Cuenta conectada: {createdIntegration.email}
+                        </p>
+                        {createdIntegration.stores && createdIntegration.stores.length > 0 && (
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            {createdIntegration.stores.length} {createdIntegration.stores.length === 1 ? 'local detectado' : 'locales detectados'}
+                          </p>
+                        )}
+                      </>
+                    )}
                   </div>
+
+                  {/* Success message when all steps are completed */}
+                  {syncProgress.steps.every(step => step.status === 'completed') && (
+                    <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                      <Check className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
+                      <p className="font-semibold text-green-900 dark:text-green-100">
+                        ¡Sincronización completada!
+                      </p>
+                      <p className="text-sm text-green-700 dark:text-green-200">
+                        Todos tus datos han sido importados correctamente
+                      </p>
+                    </div>
+                  )}
 
                   {/* Progress steps */}
                   <div className="space-y-3">
