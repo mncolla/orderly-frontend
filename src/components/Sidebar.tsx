@@ -37,7 +37,7 @@ export function Sidebar() {
     activeSyncsData: activeSyncs,
   });
 
-  // Verificar syncs activos al montar el Sidebar
+  // Verificar syncs activos al montar el Sidebar y hacer polling mientras haya syncs activos
   useEffect(() => {
     const checkForActiveSyncs = async () => {
       if (!user?.integrations) {
@@ -82,10 +82,17 @@ export function Sidebar() {
       }
     };
 
-    // Solo verificar si no hay syncs activos actualmente
-    if (!isSyncing) {
-      checkForActiveSyncs();
-    }
+    // Check inicial
+    checkForActiveSyncs();
+
+    // Polling continuo mientras haya syncs activos
+    const pollingInterval = setInterval(() => {
+      if (isSyncing) {
+        checkForActiveSyncs();
+      }
+    }, 3000); // Verificar cada 3 segundos
+
+    return () => clearInterval(pollingInterval);
   }, [user, isSyncing, updateSyncProgress, clearSync]);
 
   // Calcular el estado de los datos directamente en el Sidebar
