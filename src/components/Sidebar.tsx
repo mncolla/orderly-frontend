@@ -29,7 +29,7 @@ export function Sidebar() {
   const { logout, user } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { t } = useTranslation();
-  const { activeSyncs, isSyncing, updateSyncProgress } = useSyncStore();
+  const { activeSyncs, isSyncing, updateSyncProgress, clearSync } = useSyncStore();
 
   console.log('🎨 Sidebar - Render:', {
     activeSyncsKeys: Object.keys(activeSyncs),
@@ -61,9 +61,20 @@ export function Sidebar() {
           const result = await platformIntegrationsService.getSyncProgress(platform);
           console.log(`🎨 Sidebar - ${platform} sync status:`, result);
 
+          // Verificar si el sync realmente está en progreso
+          // No agregar si ya tiene completedAt (ya terminó)
           if (result.status === 'in_progress' && result.progress) {
-            console.log(`🎨 Sidebar - Found active sync for ${platform}, updating store`);
-            updateSyncProgress(platform, result.progress);
+            // Verificar si todos los pasos están completados
+            const allCompleted = result.progress.steps.every((step: any) => step.status === 'completed');
+            const hasCompletedAt = 'completedAt' in result.progress && result.progress.completedAt;
+
+            if (allCompleted || hasCompletedAt) {
+              console.log(`🎨 Sidebar - Sync for ${platform} is already completed, clearing from store`);
+              clearSync(platform);
+            } else {
+              console.log(`🎨 Sidebar - Found active sync for ${platform}, updating store`);
+              updateSyncProgress(platform, result.progress);
+            }
           }
         } catch (error) {
           console.error(`🎨 Sidebar - Error checking sync for ${platform}:`, error);
@@ -75,7 +86,7 @@ export function Sidebar() {
     if (!isSyncing) {
       checkForActiveSyncs();
     }
-  }, [user, isSyncing, updateSyncProgress]);
+  }, [user, isSyncing, updateSyncProgress, clearSync]);
 
   // Calcular el estado de los datos directamente en el Sidebar
   const getDataTypeStatus = (dataType: 'stores' | 'menu' | 'orders') => {
