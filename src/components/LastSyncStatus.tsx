@@ -1,6 +1,7 @@
 import { CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
+import { useSyncStore } from '@/stores/syncStore';
 import type { DeliveryPlatform } from '@/types/integrations';
 
 /**
@@ -11,6 +12,7 @@ import type { DeliveryPlatform } from '@/types/integrations';
  */
 export function LastSyncStatus() {
   const { user } = useAuth();
+  const { activeSyncs, isSyncing } = useSyncStore();
   const [timeAgo, setTimeAgo] = useState('');
 
   // Helper to get platform name
@@ -74,18 +76,22 @@ export function LastSyncStatus() {
   }
 
   // Determinar el estado y el icono
+  // Usar el estado del store de Zustand para detectar syncs activos en tiempo real
   const getStatusInfo = () => {
-    const lastSyncStatus = 'lastSyncStatus' in integration ? integration.lastSyncStatus : undefined;
-
-    if (lastSyncStatus === 'IN_PROGRESS') {
+    // Si hay un sync activo detectado por el store, mostrar estado de sincronización
+    if (isSyncing && Object.keys(activeSyncs).length > 0) {
+      const platform = Object.keys(activeSyncs)[0];
       return {
         icon: RefreshCw,
         iconClass: 'animate-spin text-blue-600 dark:text-blue-400',
-        text: `Sincronizando ${getPlatformName(integration.platform as DeliveryPlatform)}...`,
+        text: `Sincronizando ${getPlatformName(platform as DeliveryPlatform)}...`,
         bgClass: 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800',
         textClass: 'text-blue-700 dark:text-blue-300'
       };
     }
+
+    // Si no hay sync activo, usar el estado del backend
+    const lastSyncStatus = 'lastSyncStatus' in integration ? integration.lastSyncStatus : undefined;
 
     if (lastSyncStatus === 'FAILED') {
       return {
@@ -115,9 +121,9 @@ export function LastSyncStatus() {
       <StatusIcon className={`h-4 w-4 ${status.iconClass}`} />
       <div className="flex flex-col">
         <span className={`text-xs font-medium ${status.textClass}`}>
-          {integration.lastSyncStatus === 'IN_PROGRESS' ? status.text : `Última sync: ${status.text}`}
+          {isSyncing ? status.text : `Última sync: ${status.text}`}
         </span>
-        {timeAgo && integration.lastSyncStatus !== 'IN_PROGRESS' && (
+        {timeAgo && !isSyncing && (
           <span className="text-xs text-gray-600 dark:text-gray-400">
             {timeAgo}
           </span>

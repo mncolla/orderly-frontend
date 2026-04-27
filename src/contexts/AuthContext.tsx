@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authService } from '../services/authService';
 import type { User, LoginCredentials, SignupCredentials } from '../types/auth';
+import { useSyncStore } from '@/stores/syncStore';
 
 interface AuthContextType {
   user: User | null;
@@ -112,8 +113,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Función de logout
   const logout = () => {
+    console.log('🔒 Logging out - clearing all data');
+
+    // Limpiar localStorage
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
+    localStorage.removeItem('onboarding_sync_state');
+
+    // Limpiar estado de React Query
+    queryClient.clear();
+
+    // Limpiar estado del store de Zustand (syncs activos)
+    const { clearAllSyncs } = useSyncStore.getState();
+    clearAllSyncs();
+
     setUser(null);
     setError(null);
     navigate("/login", { transition: true });

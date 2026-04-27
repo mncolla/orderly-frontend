@@ -1,4 +1,4 @@
-import { useSyncContext } from '@/contexts/SyncContext';
+import { useSyncStore } from '@/stores/syncStore';
 import { useAuth } from '@/contexts/AuthContext';
 
 export type DataType = 'stores' | 'menu' | 'orders';
@@ -15,7 +15,7 @@ export interface SyncDataStatus {
  * Hook para determinar qué datos están disponibles basado en el estado del sync
  */
 export function useSyncDataStatus(): SyncDataStatus {
-  const { activeSyncs } = useSyncContext();
+  const { activeSyncs } = useSyncStore();
   const { user } = useAuth();
 
   const status: SyncDataStatus = {

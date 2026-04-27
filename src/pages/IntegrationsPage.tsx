@@ -7,7 +7,7 @@ import { SyncProgressDisplay } from '../components/SyncProgress';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import type { DeliveryPlatform } from '../types/integrations';
-import { useSyncContext } from '../contexts/SyncContext';
+import { useSyncStore } from '@/stores/syncStore';
 
 const platformNames: Record<DeliveryPlatform, string> = {
   PEDIDOS_YA: 'PedidosYa',
@@ -21,8 +21,8 @@ export function IntegrationsPage() {
   const connectMutation = useConnectPedidosYa();
   const disconnectMutation = useDisconnect();
 
-  // Use global sync context
-  const { isSyncing: isAnySyncInProgress } = useSyncContext();
+  // Use global sync store
+  const { isSyncing: isAnySyncInProgress } = useSyncStore();
 
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [showOTPModal, setShowOTPModal] = useState(false);

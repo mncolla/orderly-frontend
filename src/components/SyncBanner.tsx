@@ -1,4 +1,4 @@
-import { useSyncContext } from '@/contexts/SyncContext';
+import { useSyncStore } from '@/stores/syncStore';
 import { Loader2, RefreshCw, AlertTriangle, Calendar, Store, Smartphone } from 'lucide-react';
 import { useMemo } from 'react';
 
@@ -15,24 +15,23 @@ import { useMemo } from 'react';
  * durante sincronizaciones largas (especialmente orders sync que puede tardar horas)
  */
 export function SyncBanner() {
-  const { activeSyncs, isSyncing } = useSyncContext();
-
-  // Si no hay sincronizaciones activas, no mostrar nada
-  if (!isSyncing || Object.keys(activeSyncs).length === 0) {
-    return null;
-  }
+  const { activeSyncs, isSyncing } = useSyncStore();
 
   // Obtener la primera sincronización activa (generalmente solo hay una a la vez)
   const firstSync = Object.values(activeSyncs)[0];
-  const platform = Object.keys(activeSyncs)[0]; // [platform, progress]
+  const platform = Object.keys(activeSyncs)[0];
 
-  if (!firstSync || !platform) {
-    return null;
-  }
+  // Calcular progreso total (siempre ejecutar useMemo, incluso si no hay sync)
+  const totalProgress = useMemo(() => {
+    if (!firstSync || !platform) return 0;
+    const totalSteps = firstSync.steps.length;
+    const completedSteps = firstSync.steps.filter(s => s.status === 'completed').length;
+    return Math.round((completedSteps / totalSteps) * 100);
+  }, [firstSync, platform]);
 
-  // Obtener el nombre legible de la plataforma
-  const getPlatformName = (platform: string) => {
-    switch (platform) {
+  // Obtener el nombre legible de la plataforma (definir antes del return condicional)
+  const getPlatformName = (platformName: string) => {
+    switch (platformName) {
       case 'PEDIDOS_YA':
         return 'PedidosYa';
       case 'RAPPI':
@@ -42,16 +41,14 @@ export function SyncBanner() {
       case 'UBER_EATS':
         return 'Uber Eats';
       default:
-        return platform;
+        return platformName;
     }
   };
 
-  // Calcular progreso total
-  const totalProgress = useMemo(() => {
-    const totalSteps = firstSync.steps.length;
-    const completedSteps = firstSync.steps.filter(s => s.status === 'completed').length;
-    return Math.round((completedSteps / totalSteps) * 100);
-  }, [firstSync.steps]);
+  // Si no hay sincronizaciones activas, no mostrar nada
+  if (!isSyncing || !firstSync || !platform || Object.keys(activeSyncs).length === 0) {
+    return null;
+  }
 
   // Obtener el paso actual en progreso
   const currentStep = firstSync.steps.find(s => s.status === 'in_progress');

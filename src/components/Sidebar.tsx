@@ -5,7 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { LastSyncStatus } from './LastSyncStatus';
-import { useSyncContext } from '@/contexts/SyncContext';
+import { useSyncStore } from '@/stores/syncStore';
+import { platformIntegrationsService } from '@/services/platformIntegrationsService';
 
 const ownerSidebarItems = [
   { href: '/overview', label: 'sidebar.dashboard', icon: BarChart3, requires: 'orders' as const },
@@ -28,7 +29,7 @@ export function Sidebar() {
   const { logout, user } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { t } = useTranslation();
-  const { activeSyncs, isSyncing } = useSyncContext();
+  const { activeSyncs, isSyncing, updateSyncProgress } = useSyncStore();
 
   console.log('🎨 Sidebar - Render:', {
     activeSyncsKeys: Object.keys(activeSyncs),
@@ -36,60 +37,86 @@ export function Sidebar() {
     activeSyncsData: activeSyncs,
   });
 
-  // Estado local para forzar re-render cuando hay cambios en el contexto
-  const [, forceUpdate] = useState({});
-
-  // Escuchar eventos globales del SyncContext
+  // Verificar syncs activos al montar el Sidebar
   useEffect(() => {
-    const handleSyncUpdate = (event: CustomEvent) => {
-      console.log('📡 Sidebar - Received sync-context-updated event:', event.detail);
-      forceUpdate({});
+    const checkForActiveSyncs = async () => {
+      if (!user?.integrations) {
+        console.log('🎨 Sidebar - No user integrations, skipping sync check');
+        return;
+      }
+
+      const userPlatforms = user.integrations
+        .filter((int: any) => int.connected)
+        .map((int: any) => int.platform);
+
+      if (userPlatforms.length === 0) {
+        console.log('🎨 Sidebar - No connected platforms, skipping sync check');
+        return;
+      }
+
+      console.log('🎨 Sidebar - Checking for active syncs on platforms:', userPlatforms);
+
+      for (const platform of userPlatforms) {
+        try {
+          const result = await platformIntegrationsService.getSyncProgress(platform);
+          console.log(`🎨 Sidebar - ${platform} sync status:`, result);
+
+          if (result.status === 'in_progress' && result.progress) {
+            console.log(`🎨 Sidebar - Found active sync for ${platform}, updating store`);
+            updateSyncProgress(platform, result.progress);
+          }
+        } catch (error) {
+          console.error(`🎨 Sidebar - Error checking sync for ${platform}:`, error);
+        }
+      }
     };
 
-    window.addEventListener('sync-context-updated', handleSyncUpdate as EventListener);
-
-    return () => {
-      window.removeEventListener('sync-context-updated', handleSyncUpdate as EventListener);
-    };
-  }, []);
-
-  // Fallback: forzar actualizaciones periódicas cuando hay sync activo
-  useEffect(() => {
-    if (!isSyncing) return;
-
-    const interval = setInterval(() => {
-      forceUpdate({});
-    }, 1000); // Actualizar cada segundo durante sync
-
-    return () => clearInterval(interval);
-  }, [isSyncing]);
+    // Solo verificar si no hay syncs activos actualmente
+    if (!isSyncing) {
+      checkForActiveSyncs();
+    }
+  }, [user, isSyncing, updateSyncProgress]);
 
   // Calcular el estado de los datos directamente en el Sidebar
   const getDataTypeStatus = (dataType: 'stores' | 'menu' | 'orders') => {
     const status = { available: false, loading: false, completed: false };
 
-    // Si no hay sync activo, asumimos que los datos están disponibles
+    console.log(`🎨 getDataTypeStatus(${dataType}):`, {
+      activeSyncsCount: Object.keys(activeSyncs).length,
+      isSyncing,
+      activeSyncs,
+    });
+
+    // Verificar si el usuario tiene integraciones conectadas
+    const hasConnectedIntegrations = user?.integrations?.some(int => int.connected) || false;
+    console.log(`🎨 getDataTypeStatus(${dataType}): hasConnectedIntegrations:`, hasConnectedIntegrations);
+
+    if (!hasConnectedIntegrations) {
+      return status;
+    }
+
+    // Si no hay sync activo pero hay integraciones conectadas, asumimos que los datos están disponibles
     if (Object.keys(activeSyncs).length === 0) {
+      console.log(`🎨 getDataTypeStatus(${dataType}): No active sync, data available`);
       status.available = true;
       status.completed = true;
       return status;
     }
 
-    // Verificar si el usuario tiene integraciones conectadas
-    const hasConnectedIntegrations = user?.integrations?.some(int => int.connected) || false;
-    if (!hasConnectedIntegrations) {
-      return status;
-    }
-
     // Analizar cada sync activo
     for (const [_platform, progress] of Object.entries(activeSyncs)) {
+      console.log(`🎨 getDataTypeStatus(${dataType}): Analyzing sync for ${_platform}:`, progress);
       progress.steps.forEach((step) => {
         if (step.step === dataType) {
+          console.log(`🎨 getDataTypeStatus(${dataType}): Step ${dataType} found with status:`, step.status);
           if (step.status === 'in_progress') {
             status.loading = true;
           } else if (step.status === 'completed') {
             status.completed = true;
             status.available = true;
+          } else if (step.status === 'pending') {
+            // Si está pendiente y hay un sync activo, no está disponible
+            status.loading = true;
           }
         }
       });
@@ -102,6 +129,7 @@ export function Sidebar() {
       status.completed = true;
     }
 
+    console.log(`🎨 getDataTypeStatus(${dataType}) final:`, status);
     return status;
   };
 

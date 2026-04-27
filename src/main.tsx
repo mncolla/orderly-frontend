@@ -5,7 +5,6 @@ import './index.css'
 import App from './App.tsx'
 import './i18n/config';
 import { Toaster } from './components/ui/sonner.tsx'
-import { SyncProvider } from './contexts/SyncContext.tsx'
 
 // Limpiar datos antiguos de sync del localStorage al iniciar
 // Esto evita que el modal de OnboardingSync aparezca con información desactualizada
@@ -37,7 +36,6 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <SyncProvider>
         <Toaster style={{
           '--normal-bg':
             'color-mix(in oklab, light-dark(var(--color-green-600), var(--color-green-400)) 10%, var(--background))',
@@ -45,7 +43,6 @@ createRoot(document.getElementById('root')!).render(
           '--normal-border': 'light-dark(var(--color-green-600), var(--color-green-400))'
         } as React.CSSProperties} />
         <App />
-      </SyncProvider>
     </QueryClientProvider>
   </StrictMode>,
 )

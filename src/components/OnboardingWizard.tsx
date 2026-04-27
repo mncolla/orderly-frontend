@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { OrganizationObjective } from '../types/organization';
 import { objectiveTypeLabels, objectiveUnitLabels, ObjectiveType, ObjectiveUnit } from '../types/organization';
+import { useSyncStore } from '@/stores/syncStore';
 
 type Step = 'platform' | 'defaultConfig' | 'storeConfig' | 'objectives' | 'summary';
 type DeliveryPlatform = 'PEDIDOS_YA' | 'RAPPI' | 'GLOVO' | 'UBER_EATS';
@@ -128,6 +129,10 @@ export function OnboardingWizard() {
   // Mutation for platform connection
   const connectMutation = useConnectPedidosYa();
 
+  // Zustand store hooks for sync state
+  const updateSyncProgress = useSyncStore((state) => state.updateSyncProgress);
+  const clearSync = useSyncStore((state) => state.clearSync);
+
   // Polling effect for sync progress
   useEffect(() => {
     console.log('🔄 Polling effect check:', { syncStarted, isSyncing, selectedPlatform });
@@ -145,6 +150,7 @@ export function OnboardingWizard() {
           setIsSyncing(false);
           setSyncStarted(false);
           setIsConnecting(false);
+          clearSync(selectedPlatform); // Limpiar del store de Zustand
           localStorage.removeItem('onboarding_sync_state'); // ✅ Limpiar localStorage
           return;
         }
@@ -152,6 +158,7 @@ export function OnboardingWizard() {
         if (result.progress) {
           console.log('✅ Updating sync progress state:', result.progress);
           setSyncProgress(result.progress);
+          updateSyncProgress(selectedPlatform, result.progress); // Actualizar store de Zustand
 
           const allCompleted = result.progress.steps.every(step => step.status === 'completed');
           if (allCompleted) {
@@ -160,6 +167,7 @@ export function OnboardingWizard() {
             setSyncStarted(false);
             setIsConnecting(false); // Habilitar botón cuando se completa la sincronización
             setShowSyncWarning(false); // Cerrar el diálogo de advertencia si está abierto
+            clearSync(selectedPlatform); // Limpiar del store de Zustand
             localStorage.removeItem('onboarding_sync_state'); // ✅ Limpiar localStorage cuando termina
             setTimeout(() => {
               setCurrentStep('defaultConfig');
@@ -175,7 +183,7 @@ export function OnboardingWizard() {
       console.log('🛑 Cleaning up polling interval');
       clearInterval(pollInterval);
     };
-  }, [syncStarted, isSyncing, selectedPlatform]);
+  }, [syncStarted, isSyncing, selectedPlatform, updateSyncProgress, clearSync]);
 
   // Auto-start sync when connection is successful
   useEffect(() => {
@@ -290,6 +298,9 @@ export function OnboardingWizard() {
         };
         localStorage.setItem('onboarding_sync_state', JSON.stringify(state));
         console.log('💾 Estado inicial de sincronización guardado en localStorage:', state);
+
+        // Actualizar el store global de Zustand
+        updateSyncProgress(selectedPlatform, result.progress);
       }
     } catch (error: any) {
       console.error('❌ Error in handleStartSync:', error);

@@ -1,13 +1,11 @@
 import { Router, Route, Redirect } from 'wouter';
 import { AuthProvider } from './contexts/AuthContext';
-import { SyncProvider } from './contexts/SyncContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { OnboardingGuard } from './components/OnboardingGuard';
 import { Sidebar } from './components/Sidebar';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { OnboardingSyncProvider } from './contexts/OnboardingSyncContext';
 import { OnboardingSyncModal } from './components/OnboardingSyncModal';
-import { SyncBanner } from './components/SyncBanner';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import DebugPage from './pages/DebugPage';
@@ -49,7 +47,6 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <main className="lg:ml-64 min-h-screen">
         <div className="pt-16 lg:pt-0">
-          <SyncBanner />
           {children}
         </div>
       </main>
@@ -60,9 +57,8 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
-      <SyncProvider>
-        <OnboardingSyncProvider>
-          <Router>
+      <OnboardingSyncProvider>
+        <Router>
         {/* Debug routes - SIN AUTENTICACIÓN - Solo desarrollo */}
         <Route path="/debug" component={DebugPage} />
         <Route path="/user-debug" component={UserDebugPage} />
@@ -178,7 +174,6 @@ function App() {
         <OnboardingSyncModal />
       </Router>
     </OnboardingSyncProvider>
-      </SyncProvider>
     </AuthProvider>
   );
 }
